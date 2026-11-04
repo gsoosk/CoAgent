@@ -60,6 +60,7 @@ def sweep_derive(
 
     def build(oracle, rng, **kw):
         pf = kw.get("p_task_failure", 0.0)
+        rtr = kw.get("p_redo_truncate", 0.0)
 
         def a_fixes(view) -> List[PlanStep]:
             scope = view.get("scope") or {}
@@ -79,7 +80,7 @@ def sweep_derive(
             return steps
 
         agent_a = ScriptedAgent(
-            name="A-sweep", oracle=oracle, rng=rng, p_task_failure=pf,
+            name="A-sweep", oracle=oracle, rng=rng, p_task_failure=pf, p_redo_truncate=rtr,
             plan=[
                 PlanStep(kind=CallKind.READ, prefix=prefix, reads=(prefix,),
                          premise="scope", duration=4.0, tokens=600,
@@ -95,7 +96,7 @@ def sweep_derive(
         )
 
         agent_b = ScriptedAgent(
-            name="B-derive", oracle=oracle, rng=rng, p_task_failure=pf,
+            name="B-derive", oracle=oracle, rng=rng, p_task_failure=pf, p_redo_truncate=rtr,
             plan=[
                 PlanStep(kind=CallKind.READ, obj=source, reads=(source,),
                          premise="src", duration=4.5, tokens=400,
@@ -187,10 +188,11 @@ def lost_update(
 
     def build(oracle, rng, **kw):
         pf = kw.get("p_task_failure", 0.0)
+        rtr = kw.get("p_redo_truncate", 0.0)
 
         def mk(agent_name, fn, label):
             return ScriptedAgent(
-                name=agent_name, oracle=oracle, rng=rng, p_task_failure=pf,
+                name=agent_name, oracle=oracle, rng=rng, p_task_failure=pf, p_redo_truncate=rtr,
                 plan=[
                     PlanStep(kind=CallKind.READ, obj=obj, reads=(obj,),
                              premise="cur", duration=4.0, tokens=420,
@@ -282,9 +284,10 @@ def rmw_summary(
 
     def build(oracle, rng, **kw):
         pf = kw.get("p_task_failure", 0.0)
+        rtr = kw.get("p_redo_truncate", 0.0)
 
         agent_a = ScriptedAgent(
-            name="A-remediate", oracle=oracle, rng=rng, p_task_failure=pf,
+            name="A-remediate", oracle=oracle, rng=rng, p_task_failure=pf, p_redo_truncate=rtr,
             plan=[
                 PlanStep(kind=CallKind.READ, obj=subj, reads=(subj,),
                          premise="cur", duration=4.0, tokens=440,
@@ -312,7 +315,7 @@ def rmw_summary(
             return dict(record(view), old=prev)
 
         agent_b = ScriptedAgent(
-            name="B-audit", oracle=oracle, rng=rng, p_task_failure=pf,
+            name="B-audit", oracle=oracle, rng=rng, p_task_failure=pf, p_redo_truncate=rtr,
             plan=[
                 PlanStep(kind=CallKind.READ, obj=subj, reads=(subj,),
                          premise="src", duration=4.5, tokens=440,

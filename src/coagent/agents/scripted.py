@@ -88,6 +88,7 @@ class ScriptedAgent:
         oracle: JudgmentOracle,
         premise_sources: Optional[Dict[str, str]] = None,
         p_task_failure: float = 0.0,
+        p_redo_truncate: float = 0.0,
         rng: Any = None,
     ):
         self.name = name
@@ -95,6 +96,15 @@ class ScriptedAgent:
         self.oracle = oracle
         self.rng = rng
         self.p_task_failure = p_task_failure
+        # A restart clears the agent's context, so its redo is a *different*
+        # execution, not a replay: measured on real Workers, an aborted agent
+        # loses roughly 15 points of task completeness, and the observed
+        # mechanism is early truncation -- it re-reads, does one thing and
+        # declares done. Scripted replay models this as a perfect redo, which
+        # silently flatters every abort-based protocol.
+        self.p_redo_truncate = p_redo_truncate
+        self.truncate_redo = False
+        self._wrote_since_restart = False
         # premise key -> object it was read from
         self.premise_sources: Dict[str, str] = premise_sources or {}
         for s in plan:
@@ -204,6 +214,15 @@ class ScriptedAgent:
         """Generator of calls; ends only when the plan is done and inbox empty."""
         self.view = {}
         self.executed = set()
+        self.truncate_redo = bool(
+            getattr(st, "restarts", 0) > 0
+            and self.rng is not None
+            and self.p_redo_truncate > 0
+            and self.rng.random() < self.p_redo_truncate
+        )
+        if self.truncate_redo:
+            rt.trace(f"{self.name} redo truncated (context cleared)")
+        self._wrote_since_restart = False
         i = 0
         while i < len(self.plan):
             for rep in self._handle_notifications(rt, st):
@@ -233,11 +252,19 @@ class ScriptedAgent:
             for sub in step.expand(self.view):
                 yield from self._exec(rt, st, sub)
             return
+        if (
+            step.kind is CallKind.WRITE
+            and self.truncate_redo
+            and getattr(self, "_wrote_since_restart", False)
+        ):
+            return      # context was cleared; the rest of the plan is lost
         self.executed.add(id(step))
         call = self._call(step)
         if step.record_as:
             self.view[step.record_as] = call.args
         result = yield call
+        if step.kind is CallKind.WRITE:
+            self._wrote_since_restart = True
         if step.premise:
             self.view[step.premise] = result
         elif step.kind is CallKind.READ:

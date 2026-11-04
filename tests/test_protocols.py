@@ -166,3 +166,59 @@ class TestBaselinesAreNotStrawmanned(unittest.TestCase):
                 tok / sum(r.tokens for r in runs["serial"]), 1.02,
                 f"{proto} added token cost without contention",
             )
+
+
+class TestLossyRedo(unittest.TestCase):
+    """A cleared context makes a redo a different, worse execution.
+
+    Measured on claude-haiku-4-5 at ~15 points of lost task completeness. The
+    cost is not a property of "aborting" in general -- it scales with how much
+    work the victim had already done:
+
+      OCC victimises the sweep agent, because its broad range read is what a
+      concurrent insert invalidates. That agent has several writes, so a
+      truncated redo loses most of them.
+
+      2PL victimises the higher-sigma agent, which in these cells is the short
+      one-write partner. Truncating after its first write removes nothing.
+
+      MTPO never aborts, so there is no redo to lose.
+
+    The real Haiku run showed exactly this split: 2PL aborted the canary agent
+    10/10 and stayed 10/10 correct; OCC aborted the sweep agent 10/10 and fell
+    to 5/10.
+    """
+
+    def _correct(self, proto, p_trunc, seeds=8):
+        cfg = TrialConfig(p_misjudge=0.0, p_task_failure=0.0, jitter=0.4,
+                          len_sigma=0.4, p_redo_truncate=p_trunc)
+        ok = n = 0
+        for name, cell in CELLS.items():
+            refs = reference_states(cell)
+            for seed in range(seeds):
+                ok += run_trial(cell, proto, seed, cfg, refs).invariant_ok
+                n += 1
+        return ok / n
+
+    def test_occ_degrades_because_it_victimises_the_sweep(self):
+        clean = self._correct("OCC-saga", 0.0)
+        lossy = self._correct("OCC-saga", 0.5)
+        self.assertLess(
+            lossy, clean,
+            f"OCC should lose correctness when its redo is lossy "
+            f"(clean={clean:.2f}, lossy={lossy:.2f})",
+        )
+
+    def test_mtpo_is_unaffected(self):
+        self.assertEqual(
+            self._correct("MTPO", 0.0), self._correct("MTPO", 0.5),
+            "MTPO never aborts, so a lossy redo must cost it nothing",
+        )
+
+    def test_2pl_is_unaffected_because_its_victim_is_cheap(self):
+        """Not a property of 2PL -- a property of which agent it picks."""
+        self.assertEqual(
+            self._correct("2PL-saga", 0.0), self._correct("2PL-saga", 0.5),
+            "2PL's victim here has a single write, so truncation removes "
+            "nothing; this would not hold if the victim were the sweep",
+        )

@@ -81,6 +81,7 @@ def _canary_agents(oracle, rng, **kw):
         oracle=oracle,
         rng=rng,
         p_task_failure=kw.get("p_task_failure", 0.0),
+                p_redo_truncate=kw.get("p_redo_truncate", 0.0),
         plan=[
             PlanStep(
                 kind=CallKind.READ,
@@ -115,6 +116,7 @@ def _canary_agents(oracle, rng, **kw):
         oracle=oracle,
         rng=rng,
         p_task_failure=kw.get("p_task_failure", 0.0),
+                p_redo_truncate=kw.get("p_redo_truncate", 0.0),
         plan=[
             PlanStep(
                 kind=CallKind.READ,

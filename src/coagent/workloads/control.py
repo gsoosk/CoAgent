@@ -23,6 +23,7 @@ def disjoint_pair() -> Cell:
             return ScriptedAgent(
                 name=name, oracle=oracle, rng=rng,
                 p_task_failure=kw.get("p_task_failure", 0.0),
+                p_redo_truncate=kw.get("p_redo_truncate", 0.0),
                 plan=[
                     PlanStep(kind=CallKind.READ, obj=obj, reads=(obj,),
                              premise="c", duration=4.0, tokens=400,

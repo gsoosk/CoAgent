@@ -21,6 +21,13 @@ class TrialConfig:
 
     p_misjudge: float = 0.05     # A3: notified agent misreads relevance
     p_task_failure: float = 0.01  # A1: agent fails on its own (serial != 100%)
+    # Chance an aborted agent's redo truncates early, losing the rest of its
+    # plan. Default 0 -- a perfect replay -- because the rest of this config is
+    # calibrated to the paper's model, whose 98% serial baseline implies it
+    # also redoes well. Measured at 0.22 on claude-haiku-4-5 (a ~15 point loss
+    # of task completeness across 20 real abort events); set it when modelling
+    # a weaker agent. It only ever affects the abort-based protocols.
+    p_redo_truncate: float = 0.0
     retry_cap: int = 5            # paper section 7.1
     jitter: float = 0.40
     # latency scale, calibrated so the canary cell's serial baseline is the
@@ -36,14 +43,19 @@ class TrialConfig:
 
 def _build(cell: Cell, order: List[int], cfg: TrialConfig, rng) -> List[Any]:
     oracle = JudgmentOracle(rng, p_misjudge=cfg.p_misjudge)
-    agents = cell.build_agents(oracle, rng, p_task_failure=cfg.p_task_failure)
+    agents = cell.build_agents(
+        oracle, rng,
+        p_task_failure=cfg.p_task_failure,
+        p_redo_truncate=cfg.p_redo_truncate,
+    )
     return [agents[i] for i in order]
 
 
 def reference_states(cell: Cell) -> List[Dict[str, Any]]:
     """Run the cell serially in both orders: the two acceptable outcomes."""
     refs = []
-    clean = TrialConfig(p_misjudge=0.0, p_task_failure=0.0, jitter=0.0)
+    clean = TrialConfig(p_misjudge=0.0, p_task_failure=0.0, jitter=0.0,
+                        p_redo_truncate=0.0)
     for order in ([0, 1], [1, 0]):
         rng = random.Random(0)
         target = cell.fresh_target()

@@ -167,7 +167,87 @@ inverse coverage.
 - **OCC speedup 0.81 vs 0.93.** Our OCC victim restarts strictly after the
   winner commits, which is the worst case of the stated protocol.
 
-## 7. What this reproduction cannot establish
+## 7. The redo model, and why a simulation flatters abort-based protocols
+
+The real-LLM run (section 8) exposed the simulation's weakest assumption:
+**that a restart reproduces the original execution.** A scripted agent replays
+its plan perfectly after an abort. A real agent restarts with a cleared
+context and produces a *different, worse* run — it re-reads, does one thing
+and declares done. From a real OCC redo:
+
+> "I see the actual deployment structure now. The real deployments are
+> different from my previous [attempt]."
+
+Measured across 20 real abort events on `claude-haiku-4-5`: an aborted agent
+loses roughly **15 points of task completeness** (18 from OCC victimising the
+sweep agent, 13 from 2PL victimising the canary agent). The mechanism is early
+truncation, not random dropping, so that is what `p_redo_truncate` models.
+
+The cost is **not** a property of aborting in general — it scales with how
+much work the victim had already done:
+
+| protocol | victim | victim's writes | cost of a lossy redo |
+|---|---|---|---|
+| OCC-saga | the sweep (its broad range read is what a concurrent insert invalidates) | several | large |
+| 2PL-saga | the higher-sigma agent, here the short partner | one | none |
+| MTPO | never aborts | — | none |
+
+The real run showed exactly this split: 2PL aborted the canary agent 10/10 and
+stayed 10/10 correct; OCC aborted the sweep agent 10/10 and fell to 5/10.
+
+**`p_redo_truncate` defaults to 0** — a perfect replay — because the rest of
+this configuration is calibrated against the paper's model, whose 98% serial
+baseline implies it also redoes well. Importing a value measured on a much
+weaker model into a strong-model calibration would mix two agents. Set it
+explicitly to model a weaker one:
+
+```bash
+python3 scripts/run_matrix.py --trials 40 --redo-truncate 0.22
+```
+
+| Protocol | perfect redo (default) | lossy redo (0.22, Haiku-measured) | paper |
+|---|---|---|---|
+| serial | 98% | 98% | 98% |
+| naive | 8% | 8% | 13% |
+| 2PL-saga | 98% | 91% | 96% |
+| OCC-saga | 95% | 86% | 93% |
+| **MTPO** | **92%** | **92%** | **93%** |
+
+The practical conclusion: **the weaker the agent, the worse abort-based
+concurrency control gets, while MTPO is unaffected.** The paper's §3.3
+argument — that a failed validation discards all prior inference — has a
+sharper form than its own numbers show, because its numbers come from a model
+good enough to redo well.
+
+## 8. Real LLM Workers
+
+`scripts/run_llm_matrix.py` runs the cells with real agents. One run so far:
+`claude-haiku-4-5`, canary cell, 10 trials per protocol, $1.48.
+
+| protocol | anomaly-free | overall correct |
+|---|---|---|
+| serial | 10/10 | 5/10 |
+| naive | 6/10 | 6/10 |
+| 2PL-saga | 10/10 | 6/10 |
+| OCC-saga | 5/10 | 4/10 |
+| **MTPO** | **10/10** | 5/10 |
+
+Overall correctness is noise-dominated: Haiku fails its *own* task about half
+the time (A1 ≈ 50% against the paper's 98%), uniformly across protocols.
+Conditioning on the anomaly the cell actually tests separates the protocols
+cleanly. All 24 failures were classified; only 9 are genuine concurrency
+failures and every one is under naive or OCC.
+
+**A3 (self-healing) measured rather than assumed: 10/10.** Every notified
+agent recognised the premise conflict and repaired correctly — consistent
+with, and if anything better than, the paper's claimed 95% on
+deepseek-v4-flash. At n=10 this cannot distinguish 100% from 95%.
+
+`naive` scoring 6/10 is timing, not safety: the race only opened in 4 of 10
+runs, and when it opened naive failed 4/4. Real API latency is far more
+variable than the simulation's calibrated step durations.
+
+## 9. What this reproduction cannot establish
 
 - **The real A3 rate.** `p_misjudge = 0.05` is taken from the paper, not
   measured. Measuring it needs real Workers; `agents/llm.py` is wired for

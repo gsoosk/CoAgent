@@ -35,6 +35,10 @@ def main() -> int:
     ap.add_argument("--jitter", type=float, default=0.40)
     ap.add_argument("--len-sigma", type=float, default=0.40,
                     help="spread of per-agent task length within a pair")
+    ap.add_argument("--redo-truncate", type=float, default=0.0,
+                    help="chance an aborted agent's redo truncates early; "
+                         "0 = perfect replay (the paper's strong agent), "
+                         "0.22 = measured on claude-haiku-4-5")
     ap.add_argument("--out", default=str(ROOT / "results" / "matrix.csv"))
     args = ap.parse_args()
 
@@ -44,6 +48,7 @@ def main() -> int:
         retry_cap=args.retry_cap,
         jitter=args.jitter,
         len_sigma=args.len_sigma,
+        p_redo_truncate=args.redo_truncate,
     )
     rows = []
     for ci, (cell_name, cell) in enumerate(CELLS.items()):

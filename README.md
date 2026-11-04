@@ -168,6 +168,52 @@ numbers, and the table above is the corrected run:
 The headline MTPO numbers moved little, but they are now measured against
 both σ orders and a sound OCC baseline.
 
+## The redo model
+
+A real run against `claude-haiku-4-5` exposed the simulation's weakest
+assumption: **that a restart reproduces the original execution.** A scripted
+agent replays its plan perfectly after an abort; a real one restarts with a
+cleared context and produces a worse run. Measured across 20 real abort
+events, an aborted agent loses ~15 points of task completeness.
+
+`--redo-truncate` models it. The cost scales with how much work the victim had
+done, so it lands on OCC (which victimises the multi-write sweep agent) and
+not on 2PL (whose victim here has a single write) or MTPO (which never
+aborts):
+
+| Protocol | perfect redo (default) | lossy redo (0.22) |
+|---|---|---|
+| 2PL-saga | 98% | 91% |
+| OCC-saga | 95% | 86% |
+| **MTPO** | **92%** | **92%** |
+
+It defaults to **0**, because the rest of the configuration is calibrated to
+the paper's model, whose 98% serial baseline implies it also redoes well —
+importing a weak-model number into a strong-model calibration would mix two
+agents. The takeaway stands either way: **the weaker the agent, the worse
+abort-based concurrency control gets, and MTPO is unaffected.**
+
+## Real LLM Workers: the A3 assumption, measured
+
+One run so far — `claude-haiku-4-5`, canary cell, 10 trials per protocol,
+$1.48 (`results/llm_runs.jsonl`, `results/figures/llm_canary.png`).
+
+| protocol | anomaly-free | overall correct |
+|---|---|---|
+| serial | 10/10 | 5/10 |
+| naive | 6/10 | 6/10 |
+| 2PL-saga | 10/10 | 6/10 |
+| OCC-saga | 5/10 | 4/10 |
+| **MTPO** | **10/10** | 5/10 |
+
+Overall correctness is noise: Haiku fails its *own* task ~half the time (A1 ≈
+50% vs the paper's 98%), uniformly across protocols. Conditioning on the
+anomaly the cell tests separates them cleanly — of 24 failures, only 9 are
+genuine concurrency failures and all 9 are under naive or OCC.
+
+**A3 self-healing, measured rather than assumed: 10/10.** Every notified agent
+recognised the premise conflict and repaired. The paper assumes 95%.
+
 ## Caveats
 
 Short version: the protocol is faithful, nine of ten workloads are
