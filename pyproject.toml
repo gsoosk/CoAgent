@@ -1,0 +1,18 @@
+[project]
+name = "coagent-repro"
+version = "0.1.0"
+description = "Reproduction of the CoAgent/MTPO benchmarks (arXiv 2606.15376)"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+figures = ["matplotlib>=3.7"]
+llm = ["requests>=2.31"]
+dev = ["pytest>=8.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
