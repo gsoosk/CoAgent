@@ -195,6 +195,85 @@ abort-based concurrency control gets, and MTPO is unaffected.**
 
 ## Real LLM Workers: the A3 assumption, measured
 
+**claude-haiku-4-5, all 10 cells, 5 protocols, 10 trials each — 501 trials,
+$8.58** (`results/figures/llm_matrix.png`).
+
+Overall correctness is dominated by A1 (Haiku fails its own task ~28% of the
+time vs the paper's 2%), uniformly across protocols. Each cell carries an
+`anomaly_free` predicate isolating the concurrency outcome. Two cells are
+excluded because serial itself fails them — there, an A1-mangled result is
+indistinguishable from a real anomaly, and `analyze_llm.py` detects that
+automatically.
+
+On the 8 cells where serial scores 100%:
+
+| protocol | anomaly-free | 95% CI | paper |
+|---|---|---|---|
+| serial | **100%** (80/80) | [95, 100] | 98 |
+| naive | 45% (36/80) | [35, 56] | 13 |
+| 2PL-saga | **95%** (76/80) | [88, 98] | 96 |
+| OCC-saga | 85% (67/79) | [75, 91] | 93 |
+| **MTPO** | **91%** (73/80) | [83, 96] | 93 |
+
+Three of five land within two points of the paper on a far weaker model.
+OCC also pays 13.0 rounds/trial against everyone else's ~8 — the
+abort-and-redo tax, measured.
+
+**A3 self-healing: 71/78 = 91%, CI [83, 96].** The paper *assumes* 95%;
+MTPO's whole correctness claim rests on it. It is inside the interval.
+
+![real LLM results](results/figures/llm_matrix.png)
+
+## Adversarial review
+
+The implementation was reviewed adversarially after the first results were
+produced; the review found nine real defects, each with a reproduction.
+`tests/test_review_regressions.py` pins every one. Three changed published
+numbers, and the table above is the corrected run:
+
+| Defect | Effect |
+|---|---|
+| Thomas write rule applied at object granularity while every blind tool is field-granular | a late write to `replicas` was silently dropped because a write to `image` sat above it — invariant false in 330/800 randomized trials |
+| Saga undo snapshot-restored the whole object | an OCC loser's abort destroyed the winner's committed write; **OCC's correctness was understated at 91%, actually 95%** |
+| `p_task_failure` re-rolled on every restart | abort-heavy protocols absorbed more individual failures than MTPO at the same nominal rate — **biased 2PL and OCC down** |
+| `expand`-generated plan steps were never repairable | sweep agents could not self-heal; masked because the sweep agent always got σ=0 |
+| Launch order pinned to `[0, 1]` | hid the above, and made the same agent the deadlock victim in every trial |
+| Premise refresh dropped *all* the reader's own writes | broke read-your-own-writes; now keyed on the read's position |
+| Reorder path and rw push both notified the same reader | double-billed context and consumed two judgement rolls per event |
+| `str.startswith` object matching | `geo-canary` treated as a child of `geo`, corrupting a point premise |
+| Deadlock detection required *every* agent blocked | a real 2-agent cycle went undetected whenever a third agent had finished |
+| Reading a missing object materialized a `None` phantom | range reads saw it, making the correctness oracle protocol-dependent |
+
+The headline MTPO numbers moved little, but they are now measured against
+both σ orders and a sound OCC baseline.
+
+## The redo model
+
+A real run against `claude-haiku-4-5` exposed the simulation's weakest
+assumption: **that a restart reproduces the original execution.** A scripted
+agent replays its plan perfectly after an abort; a real one restarts with a
+cleared context and produces a worse run. Measured across 20 real abort
+events, an aborted agent loses ~15 points of task completeness.
+
+`--redo-truncate` models it. The cost scales with how much work the victim had
+done, so it lands on OCC (which victimises the multi-write sweep agent) and
+not on 2PL (whose victim here has a single write) or MTPO (which never
+aborts):
+
+| Protocol | perfect redo (default) | lossy redo (0.22) |
+|---|---|---|
+| 2PL-saga | 98% | 91% |
+| OCC-saga | 95% | 86% |
+| **MTPO** | **92%** | **92%** |
+
+It defaults to **0**, because the rest of the configuration is calibrated to
+the paper's model, whose 98% serial baseline implies it also redoes well —
+importing a weak-model number into a strong-model calibration would mix two
+agents. The takeaway stands either way: **the weaker the agent, the worse
+abort-based concurrency control gets, and MTPO is unaffected.**
+
+## Real LLM Workers: the A3 assumption, measured
+
 One run so far — `claude-haiku-4-5`, canary cell, 10 trials per protocol,
 $1.48 (`results/llm_runs.jsonl`, `results/figures/llm_canary.png`).
 

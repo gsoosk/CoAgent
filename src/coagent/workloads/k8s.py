@@ -194,6 +194,11 @@ register(
         },
         build_agents=_canary_agents,
         semantic_invariant=_canary_invariant,
+        anomaly_free=lambda final, refs: (
+            (final.get(DEPLOY + "geo-canary") or {}).get("image")
+            == (final.get(DEPLOY + "geo") or {}).get("image")
+            and final.get(DEPLOY + "geo-canary") is not None
+        ),
         llm_spec={
             "tasks": [
                 "A faulty rollout left an unknown subset of deployments "

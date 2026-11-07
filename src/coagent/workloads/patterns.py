@@ -161,10 +161,17 @@ def sweep_derive(
         ],
     }
 
+    def anomaly_free(final, refs):
+        """The derived object must mirror its source, whatever else broke."""
+        tgt, src = final.get(target), final.get(source)
+        if tgt is None or src is None:
+            return False
+        return tgt.get(field) == src.get(field)
+
     return Cell(
         name=name, suite=suite, anomaly=anomaly, description=description,
         initial=initial, build_agents=build, semantic_invariant=invariant,
-        llm_spec=llm_spec,
+        llm_spec=llm_spec, anomaly_free=anomaly_free,
     )
 
 
@@ -230,11 +237,17 @@ def lost_update(
         ],
     }
 
+    def anomaly_free(final, refs):
+        """Neither update may be lost: the value must be a serial outcome."""
+        got = (final.get(obj) or {}).get(field)
+        legal = {(r.get(obj) or {}).get(field) for r in refs}
+        return got in legal
+
     return Cell(
         name=name, suite=suite,
         anomaly="lost update (ww + rw on one object)",
         description=description, initial=initial, build_agents=build,
-        llm_spec=llm_spec,
+        llm_spec=llm_spec, anomaly_free=anomaly_free,
     )
 
 
@@ -340,15 +353,24 @@ def rmw_summary(
         )
         return [agent_a, agent_b]
 
+    # The reference states are produced by the scripted agents, whose records
+    # have a fixed key schema. A model writing a semantically identical record
+    # with different keys would be scored wrong for no protocol-relevant
+    # reason, so the exact shape is part of the task.
     llm_spec = {
         "tasks": [
-            f"Read '{subj}'. Set its {field} to {good!r}. Then append a "
-            f"record to the log '{log_obj}' noting that you remediated it.",
-            f"Read '{subj}', then append one audit record to the log "
-            f"'{log_obj}' stating the {field} value it is actually running. "
-            f"If you later learn that value changed, correct your existing "
-            f"record rather than filing a second one -- the log must end up "
-            f"with exactly one record from you.",
+            f"Read '{subj}'. Set its {field} to {good!r}. Then append exactly "
+            f"this record to the log '{log_obj}':\n"
+            f'  {{"by": "A", "event": "remediated", "obj": "{subj}"}}\n'
+            f"Use those exact keys and values.",
+            f"Read '{subj}', then append exactly one audit record to the log "
+            f"'{log_obj}' with this exact shape:\n"
+            f'  {{"by": "B", "event": "observed", "{field}": <the {field} '
+            f'value {subj} is actually running>}}\n'
+            f"Use those exact keys. If you later learn that value changed, "
+            f"correct your existing record with replace_log_entry rather than "
+            f"filing a second one -- the log must end up with exactly one "
+            f"record whose \"by\" is \"B\".",
         ],
         "tools": [
             {"name": "get_object", "kind": "read",
@@ -365,9 +387,29 @@ def rmw_summary(
         ],
     }
 
+    def anomaly_free(final, refs):
+        """The log must read as one of the two serial orders.
+
+        Here the anomaly is the *pairing* of order and observed value, not
+        either alone. Both orders are legal -- B first and it observes the
+        pre-remediation value, A first and it observes the repaired one --
+        but A's record followed by B reporting the stale value is an
+        interleaving neither serial order produces. Checking only B's value
+        would pass that; checking only the order would too.
+        """
+        def shape(log):
+            return [
+                (e.get("by"), e.get(field))
+                for e in (log or []) if isinstance(e, dict)
+            ]
+
+        return shape(final.get(log_obj)) in [
+            shape(r.get(log_obj)) for r in refs
+        ]
+
     return Cell(
         name=name, suite=suite,
         anomaly="non-idempotent append + stale premise (RMW composition)",
         description=description, initial=initial, build_agents=build,
-        llm_spec=llm_spec,
+        llm_spec=llm_spec, anomaly_free=anomaly_free,
     )

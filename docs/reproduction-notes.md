@@ -221,31 +221,87 @@ good enough to redo well.
 
 ## 8. Real LLM Workers
 
-`scripts/run_llm_matrix.py` runs the cells with real agents. One run so far:
-`claude-haiku-4-5`, canary cell, 10 trials per protocol, $1.48.
+`scripts/run_llm_matrix.py` runs the cells with real agents; `analyze_llm.py`
+scores them. One full run: **claude-haiku-4-5, all 10 cells, 5 protocols,
+10 trials each — 501 trials, $8.58** (`results/llm_runs.jsonl`,
+`results/figures/llm_matrix.png`).
 
-| protocol | anomaly-free | overall correct |
-|---|---|---|
-| serial | 10/10 | 5/10 |
-| naive | 6/10 | 6/10 |
-| 2PL-saga | 10/10 | 6/10 |
-| OCC-saga | 5/10 | 4/10 |
-| **MTPO** | **10/10** | 5/10 |
+### Reading the right column
 
-Overall correctness is noise-dominated: Haiku fails its *own* task about half
-the time (A1 ≈ 50% against the paper's 98%), uniformly across protocols.
-Conditioning on the anomaly the cell actually tests separates the protocols
-cleanly. All 24 failures were classified; only 9 are genuine concurrency
-failures and every one is under naive or OCC.
+Overall task correctness mixes two things. Haiku fails its *own* task about a
+quarter to a third of the time (A1 = 72% against the paper's 98%), uniformly
+across protocols, which buries the protocol signal. Each cell therefore
+carries an `anomaly_free` predicate isolating the concurrency outcome.
 
-**A3 (self-healing) measured rather than assumed: 10/10.** Every notified
-agent recognised the premise conflict and repaired correctly — consistent
-with, and if anything better than, the paper's claimed 95% on
-deepseek-v4-flash. At n=10 this cannot distinguish 100% from 95%.
+**Two of the ten cells have an unreliable predicate and are excluded from the
+aggregate.** Serial execution has no concurrency, so anything it flags is the
+predicate misfiring — and on `k8s-rollback-audit` serial scores 5/10, on
+`wb-email-triage` 9/10. In those RMW cells an A1-mangled log is
+indistinguishable from a genuine anomaly. `analyze_llm.py` detects this
+automatically and reports the trustworthy scope; the figure red-outlines them.
 
-`naive` scoring 6/10 is timing, not safety: the race only opened in 4 of 10
-runs, and when it opened naive failed 4/4. Real API latency is far more
-variable than the simulation's calibrated step durations.
+### Results, 8 cells where serial scores 100%
+
+| protocol | anomaly-free | 95% CI | overall ok | rounds/trial | paper |
+|---|---|---|---|---|---|
+| serial | **100%** (80/80) | [95, 100] | 58/80 | 7.1 | 98 |
+| naive | 45% (36/80) | [35, 56] | 29/80 | 8.1 | 13 |
+| 2PL-saga | **95%** (76/80) | [88, 98] | 57/80 | 9.1 | 96 |
+| OCC-saga | 85% (67/79) | [75, 91] | 56/79 | 13.0 | 93 |
+| **MTPO** | **91%** (73/80) | [83, 96] | 53/80 | 8.1 | 93 |
+
+Three of the five land within a couple of points of the paper despite a much
+weaker model: serial 100 vs 98, 2PL 95 vs 96, MTPO 91 vs 93. OCC runs lower
+(85 vs 93) and naive much higher (45 vs 13) — the latter is timing, not
+safety: real API latency is far more variable than the simulation's
+calibrated step durations, so the race does not open on every schedule.
+
+OCC's 13.0 rounds/trial against everyone else's ~8 is the abort-and-redo tax,
+measured rather than modelled.
+
+### A3, the assumption the paper leans on
+
+**71/78 = 91%, CI [83, 96].** The paper assumes 95%, which is inside the
+interval. This is the number worth having: MTPO's entire correctness claim
+rests on a notified agent correctly judging whether a conflicting write
+invalidated its premise, and the paper assumes that rate rather than
+measuring it. On a model far weaker than theirs, it holds.
+
+### A gap the simulation cannot show: premise refresh vs. re-read
+
+On `k8s-replica-scale` — a lost update, where both agents read *and write* the
+same object — MTPO dropped to 60% anomaly-free, the first cell where it is not
+perfect. Three of the four failures are plain A3 misses. The fourth is a
+protocol-usability gap, visible verbatim in the transcript:
+
+> "The notification shows the object now has replicas: **8** after the
+> concurrent agent's write" → issues a confirming re-read →
+> "After re-reading, the object now shows replicas: **7**." → writes 7 + 3 =
+> **10**. The serial answer is 11.
+
+Both numbers are correct, and that is the problem:
+
+* the **notification** carries the premise refresh, which excludes the
+  receiver's own later writes (section 2, decision 1) — so it reports **8**;
+* a **filtered read** is `M(o, sigma_j)`, which *includes* the agent's own
+  writes, because an agent must see its own effects — so it returns **7**.
+
+An agent mid-repair is therefore handed two individually-correct values for
+one object with no way to tell which to recompute from. The scripted agent
+never meets this: it recomputes from the premise the notification refreshed
+and gets 11 every time. A real agent's instinct is to re-read and confirm,
+and that reads back its own superseded write.
+
+This is arguably a gap in the paper too. Section 5.3 specifies what a
+notification carries but says nothing about what a *subsequent read* should
+return to an agent that is mid-repair, and the distinction only bites when an
+agent reads and writes the same object — which none of the paper's worked
+examples do.
+
+Two candidate fixes, neither applied here (changing them mid-run would
+invalidate the trials): state in the notification that a re-read will include
+the agent's own prior write, or expose a `read_premise` tool distinct from
+`read`.
 
 ## 9. What this reproduction cannot establish
 

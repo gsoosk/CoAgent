@@ -30,6 +30,12 @@ class Cell:
     description: str = ""
     # optional extra semantic predicate over the final state
     semantic_invariant: Optional[Callable[[Dict[str, Any]], bool]] = None
+    # Did the *concurrency anomaly* occur, independent of whether either
+    # agent finished its own task? Overall correctness mixes the two, and
+    # with a weak model the agent's own failure rate swamps the protocol
+    # signal -- so this is the measure that separates protocols.
+    # Signature: (final_state, reference_states) -> bool
+    anomaly_free: Optional[Callable[[Dict[str, Any], List[Dict[str, Any]]], bool]] = None
     # what a real LLM Worker needs to run this cell: one natural-language
     # task per agent, plus the tool catalog it may call. Declared as plain
     # data so the workload package stays free of the HTTP backend.
