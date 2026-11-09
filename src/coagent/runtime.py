@@ -41,6 +41,8 @@ class Call:
     label: str = ""
     # Range reads (`list deployments`) read a subtree rather than one object.
     prefix: Optional[str] = None
+    # index of the declaring agent's certified piece this call belongs to
+    piece: Optional[int] = None
 
     def describe(self) -> str:
         return self.label or f"{self.kind.value}:{self.obj}"
@@ -252,6 +254,10 @@ class Runtime:
         dur = call.duration * self.time_scale * st.speed * self._jitter()
         if call.kind is CallKind.THINK:
             st.pending_call = None
+            # A piece boundary at a reasoning gap is the whole point of
+            # chopping: the lock must be released *before* the agent
+            # spends minutes thinking, not after.
+            self.protocol.on_think(self, st, call)
             st.ready_at = self.now + dur
             return
 

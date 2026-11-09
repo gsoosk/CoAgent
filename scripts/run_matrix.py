@@ -118,9 +118,11 @@ def main() -> int:
         )
         dl = statistics.mean(r.deadlocks for r in all_r)
         ab = statistics.mean(r.aborts for r in all_r)
-        p = paper[proto]
+        ref = paper.get(proto)
+        tail = (f"   {ref[0]:>3}% / {ref[1]:.2f} / {ref[2]:.2f}" if ref
+                else "   (not in the paper)")
         print(f"{proto:10}{corr:9.0f}%{sp:9.2f}{cost:7.2f}{dl:10.2f}{ab:10.2f}"
-              f"   {p[0]:>3}% / {p[1]:.2f} / {p[2]:.2f}")
+              + tail)
         summary[proto] = (corr, sp, cost, dl, ab)
 
     # Only MTPO claims this: at quiescence the live copy equals the
@@ -128,6 +130,11 @@ def main() -> int:
     # no such promise, so checking them against it is meaningless.
     mtpo_rows = [r for r in rows if r.protocol == "MTPO"]
     bad_traj = [r for r in mtpo_rows if not r.trajectory_match]
+    chop = [r for r in rows if r.protocol == "chopping"]
+    if chop:
+        print()
+        print("certified chopping: a refused revision is the mechanism "
+              "working, not a failure")
     print(f"\nMTPO: live state == sigma-serial state in "
           f"{len(mtpo_rows) - len(bad_traj)}/{len(mtpo_rows)} trials")
     print(f"wrote {args.out}  ({len(rows)} trials)")

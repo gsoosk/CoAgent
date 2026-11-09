@@ -145,6 +145,29 @@ is already set up; the core stays standard-library only).
 Reproducing §7.4's pass rates additionally needs a live `kind` cluster — see
 reproduction notes §7.
 
+## Certified chopping (branch `idea`)
+
+An implementation of *Certified Chopping for Agent Tool Workflows* — static
+SC-graph certification over declared piece footprints, with prefix-aware
+admission of mid-flight plan revisions (Theorem 2, Corollary 1, Theorem 3).
+See [`docs/certified-chopping.md`](docs/certified-chopping.md).
+
+Real LLM Workers, 720 trials:
+
+| protocol | anomaly-free | speedup | token cost | rounds/trial |
+|---|---|---|---|---|
+| serial | 100% | 1.00 | 1.00 | 6.9 |
+| naive | 56% | 1.40 | 1.20 | 7.7 |
+| 2PL-saga | 96% | 0.93 | 1.17 | 8.5 |
+| OCC-saga | 88% | 0.78 | 1.90 | 12.3 |
+| MTPO | 93% | 1.36 | 1.19 | 7.7 |
+| **certified chopping** | **96%** | **1.18** | **1.02** | **7.1** |
+
+Best safety among concurrent policies, the only safe one that is also faster
+than serial, at essentially serial token cost, with zero deadlocks by
+construction. `tests/test_chopping.py` verifies the mechanism against a
+brute-force serializability oracle.
+
 ## Adversarial review
 
 The implementation was reviewed adversarially after the first results were
@@ -250,6 +273,29 @@ clock — not a simulated one. The ordering the paper reports survives: MTPO
 Figure 7a is not rebuilt: it measures the ToolSmith's catalogue growth, which
 involves no Worker LLM, so a real-agent version needs a real ToolSmith agent —
 separate work.
+
+## Certified chopping (branch `idea`)
+
+An implementation of *Certified Chopping for Agent Tool Workflows* — static
+SC-graph certification over declared piece footprints, with prefix-aware
+admission of mid-flight plan revisions (Theorem 2, Corollary 1, Theorem 3).
+See [`docs/certified-chopping.md`](docs/certified-chopping.md).
+
+Real LLM Workers, 720 trials:
+
+| protocol | anomaly-free | speedup | token cost | rounds/trial |
+|---|---|---|---|---|
+| serial | 100% | 1.00 | 1.00 | 6.9 |
+| naive | 56% | 1.40 | 1.20 | 7.7 |
+| 2PL-saga | 96% | 0.93 | 1.17 | 8.5 |
+| OCC-saga | 88% | 0.78 | 1.90 | 12.3 |
+| MTPO | 93% | 1.36 | 1.19 | 7.7 |
+| **certified chopping** | **96%** | **1.18** | **1.02** | **7.1** |
+
+Best safety among concurrent policies, the only safe one that is also faster
+than serial, at essentially serial token cost, with zero deadlocks by
+construction. `tests/test_chopping.py` verifies the mechanism against a
+brute-force serializability oracle.
 
 ## Adversarial review
 

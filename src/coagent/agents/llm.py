@@ -75,6 +75,7 @@ class LLMAgent:
         provider: str = "openrouter",
         model: Optional[str] = None,
         max_rounds: int = 14,
+        pieces: Optional[List[Any]] = None,
         **backend_kw: Any,
     ):
         self.name = name
@@ -88,9 +89,16 @@ class LLMAgent:
         self.rounds = 0
         self.refusals = 0
         self.unparsed = 0
+        # Footprints are supplied by the workload, not inferred from the
+        # model: the paper evaluates *enforcement* of manifests, not
+        # their derivation.
+        self._pieces = pieces or []
         self.transcript: List[Dict[str, Any]] = []
         # (agent, kind, label, t, dur) per dispatched call, for timelines
         self.events: List[Dict[str, Any]] = []
+
+    def declare_pieces(self):
+        return list(self._pieces)
 
     @property
     def model(self) -> str:

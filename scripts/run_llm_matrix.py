@@ -39,6 +39,13 @@ from coagent.runtime import CallKind, Runtime          # noqa: E402
 from coagent.workloads import CELLS                    # noqa: E402
 from coagent.workloads.base import invariant_ok, normalize  # noqa: E402
 
+
+class _JudgeStub:
+    """The probe only needs declare_pieces(), never a judgement."""
+
+    def is_relevant(self, truly):
+        return truly
+
 # rough per-trial usage, from the simulated token model; only used for --dry-run
 EST_PROMPT = 40_000
 EST_COMPLETION = 2_500
@@ -163,10 +170,19 @@ def main() -> int:
             refs = reference_states(cell)
             tools = to_toolspecs(cell.llm_spec)
             target = cell.fresh_target()
+            # Certified chopping needs a declared plan. Footprints come from
+            # the workload (the paper supplies them the same way), so take
+            # them from the cell's own scripted agents.
+            import random as _r
+            _probe = cell.build_agents(
+                _JudgeStub(), _r.Random(0), p_task_failure=0.0)
+            declared = [getattr(a, "declare_pieces", lambda: [])()
+                        for a in _probe]
             agents = [
                 LLMAgent(f"agent-{i}", task, tools,
                          provider=args.provider, model=model,
                          max_rounds=args.max_rounds,
+                         pieces=declared[i] if i < len(declared) else [],
                          effort=args.effort, thinking=not args.no_thinking)
                 for i, task in enumerate(cell.llm_spec["tasks"])
             ]

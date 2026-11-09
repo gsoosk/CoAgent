@@ -300,7 +300,13 @@ def main() -> int:
     print(f"{'':10}{'LLM / paper':>18}{'LLM / paper':>16}{'LLM / paper':>16}")
     print("-" * 60)
     for i, p in enumerate(PROTOCOL_ORDER):
-        pc, ps, pct = PAPER[p]
+        ref = PAPER.get(p)
+        if ref is None:          # certified chopping is not in that paper
+            print(f"{p:10}{f'{corr[i]:.0f}% / --':>18}"
+                  f"{f'{speed[i]:.2f} / --':>16}"
+                  f"{f'{cost[i]:.2f} / --':>16}")
+            continue
+        pc, ps, pct = ref
         print(f"{p:10}{f'{corr[i]:.0f}% / {pc}%':>18}"
               f"{f'{speed[i]:.2f} / {ps:.2f}':>16}"
               f"{f'{cost[i]:.2f} / {pct:.2f}':>16}")

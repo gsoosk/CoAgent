@@ -18,6 +18,7 @@ import copy
 from dataclasses import dataclass, field
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
+from ..chopping import Access, Mode
 from ..core import Footprint, Tool, covered_by, is_descendant
 from ..runtime import AgentState, Call, CallKind, Runtime
 
@@ -105,6 +106,7 @@ class ScriptedAgent:
         self.p_redo_truncate = p_redo_truncate
         self.truncate_redo = False
         self._wrote_since_restart = False
+        self._piece_of_step: Dict[int, int] = {}
         # premise key -> object it was read from
         self.premise_sources: Dict[str, str] = premise_sources or {}
         for s in plan:
@@ -121,6 +123,52 @@ class ScriptedAgent:
         )
 
     # -- call construction -------------------------------------------------
+    # -- certified chopping ------------------------------------------------
+    def declare_pieces(self):
+        """One piece per I/O step: the finest chopping on offer.
+
+        A step that expands at runtime (a sweep whose write set depends on
+        what it just scanned) cannot name its keys in advance, so it declares
+        a contingent *range* footprint over the subtree it will touch. That
+        is the paper's own advice: declare the contingent footprint up front
+        rather than escalate after committing a prefix.
+        """
+        out = []
+        pending_think = []
+        for i, step in enumerate(self.plan):
+            if step.kind is CallKind.THINK:
+                # A reasoning gap belongs to whichever piece comes *next*, so
+                # the runtime can tell a real boundary from a think inside a
+                # piece that certification merged.
+                pending_think.append(step)
+                continue
+            fp = set()
+            for k in step.reads:
+                fp.add(Access.prefix(k, Mode.READ) if k.endswith("/")
+                       else Access.key(k, Mode.READ))
+            for k in step.writes:
+                fp.add(Access.prefix(k, Mode.WRITE) if k.endswith("/")
+                       else Access.key(k, Mode.WRITE))
+            if step.expand is not None and not fp:
+                # contingent: it may write anywhere under what it scanned
+                for prev in self.plan[:i]:
+                    for k in prev.reads:
+                        if k.endswith("/"):
+                            fp.add(Access.prefix(k, Mode.WRITE))
+            for t in pending_think:
+                self._piece_of_step[id(t)] = len(out)
+            pending_think = []
+            self._piece_of_step[id(step)] = len(out)
+            out.append((fp, step.label or f"p{len(out)}"))
+        for t in pending_think:          # trailing thinks close the last piece
+            self._piece_of_step[id(t)] = max(len(out) - 1, 0)
+        return out
+
+    def _piece_index(self, step: PlanStep):
+        if not self._piece_of_step:
+            self.declare_pieces()
+        return self._piece_of_step.get(id(step))
+
     def _call(self, step: PlanStep) -> Call:
         return Call(
             kind=step.kind,
@@ -132,6 +180,7 @@ class ScriptedAgent:
             tokens=step.tokens,
             label=step.label or step.obj,
             prefix=step.prefix,
+            piece=self._piece_index(step),
         )
 
     # -- notification handling --------------------------------------------

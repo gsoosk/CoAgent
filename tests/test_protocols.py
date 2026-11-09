@@ -8,7 +8,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
 from coagent.protocols import PROTOCOL_ORDER                       # noqa: E402
 from coagent.runner import TrialConfig, reference_states, run_trial  # noqa: E402
-from coagent.workloads import CELLS                                # noqa: E402
+from coagent.workloads import CELLS, CONTENDED                     # noqa: E402
 from coagent.workloads.base import states_equal                    # noqa: E402
 from coagent.workloads.micro import halving_pair                   # noqa: E402
 
@@ -59,7 +59,7 @@ class TestMTPOSerializability(unittest.TestCase):
 class TestCellsAreContended(unittest.TestCase):
     def test_naive_violates_every_cell(self):
         """If uncoordinated execution passes, the cell is not contended."""
-        for name, cell in CELLS.items():
+        for name, cell in CONTENDED.items():
             refs = reference_states(cell)
             r = run_trial(cell, "naive", 3, CLEAN, refs)
             self.assertFalse(r.invariant_ok, f"{name} is not contended")

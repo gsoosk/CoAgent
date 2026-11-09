@@ -41,6 +41,10 @@ class Protocol:
     def on_write(self, rt: Runtime, st: AgentState, call: Call) -> Outcome:
         raise NotImplementedError
 
+    def on_think(self, rt: Runtime, st: AgentState, call: Call) -> None:
+        """The agent has entered a private reasoning interval."""
+        pass
+
     def on_commit(self, rt: Runtime, st: AgentState) -> None:
         pass
 
