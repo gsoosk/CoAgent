@@ -43,17 +43,30 @@ itself fails their predicate.
 | protocol | anomaly-free | 95% CI | speedup | token cost | rounds/trial |
 |---|---|---|---|---|---|
 | serial | 100% | [96, 100] | 1.00 | 1.00 | 6.9 |
-| naive | 56% | [46, 65] | 1.40 | 1.20 | 7.7 |
-| 2PL-saga | 96% | [90, 98] | 0.93 | 1.17 | 8.5 |
-| OCC-saga | 88% | [80, 93] | 0.78 | 1.90 | 12.3 |
-| MTPO | 93% | [86, 97] | 1.36 | 1.19 | 7.7 |
-| **certified chopping** | **96%** | **[90, 98]** | **1.18** | **1.02** | **7.1** |
+| naive | 56% | [46, 65] | 1.45 | 1.19 | 7.7 |
+| 2PL-saga | 96% | [90, 98] | 1.05 | 1.20 | 8.5 |
+| OCC-saga | 88% | [80, 93] | 0.76 | 1.91 | 12.3 |
+| MTPO | 93% | [86, 97] | 1.47 | 1.22 | 7.7 |
+| **certified chopping** | **96%** | **[90, 98]** | **1.23** | **1.01** | **7.1** |
+
+Per-cell aggregates are **medians**. One 2PL trial in 722 ended with an
+agent still blocked and its virtual clock ran away to 15029 s against a 16 s
+cell median; a single such trial moves a mean by two orders of magnitude and
+a median not at all. Using means, 2PL's speedup reads 0.93 instead of 1.05.
 
 Certified chopping is the best safety on offer among concurrent policies —
 tied with 2PL, above MTPO — and it is the only one of the three that is both
 safe *and* faster than serial, at essentially serial token cost. It takes
 fewer rounds than every other concurrent policy and has zero deadlocks by
 construction, against 2PL's 0.79 per trial in the simulated matrix.
+
+## Figures
+
+| file | what it shows |
+|---|---|
+| `fig_chopping.png` | safety, speed, cost and the safety-vs-speed front against every other protocol |
+| `fig_chopping_where.png` | per-cell speedup over whole-workflow 2PL — where chopping pays and where it correctly collapses |
+| `fig_chopping_admission.png` | what certification decided, at launch and mid-flight |
 
 ## Where it pays and where it does not
 

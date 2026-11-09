@@ -39,6 +39,10 @@ from coagent.workloads import CELLS             # noqa: E402
 
 import re
 
+# Per-cell aggregates use the MEDIAN, not the mean: one 2PL trial in
+# 722 ended with an agent still blocked and its virtual clock ran away
+# to 15029s against a 16s cell median. A single such trial moves a
+# mean by two orders of magnitude; it moves a median not at all.
 BLUE, ORANGE = "#2a78d6", "#eb6834"
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d9d8d3"
 PAPER = {"serial": (98, 1.00, 1.00), "naive": (13, 1.54, 1.06),
@@ -234,11 +238,11 @@ def main() -> int:
         lohi.append((lo * 100, hi * 100))
         sp, ct = [], []
         for c in cells:
-            s_w = statistics.mean(x["wall"] for x in by[(c, "serial")])
-            s_t = statistics.mean(x["prompt_tokens"] + x["completion_tokens"]
+            s_w = statistics.median(x["wall"] for x in by[(c, "serial")])
+            s_t = statistics.median(x["prompt_tokens"] + x["completion_tokens"]
                                   for x in by[(c, "serial")])
-            p_w = statistics.mean(x["wall"] for x in by[(c, p)])
-            p_t = statistics.mean(x["prompt_tokens"] + x["completion_tokens"]
+            p_w = statistics.median(x["wall"] for x in by[(c, p)])
+            p_t = statistics.median(x["prompt_tokens"] + x["completion_tokens"]
                                   for x in by[(c, p)])
             sp.append(s_w / p_w)
             ct.append(p_t / s_t)

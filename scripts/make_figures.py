@@ -48,17 +48,20 @@ def load(path: Path):
     out = {}
     for p in PROTOCOL_ORDER:
         rs = [r for c in cells for r in by[(c, p)]]
+        if not rs:          # a protocol this CSV predates
+            continue
         corr = 100.0 * sum(int(r["invariant_ok"]) for r in rs) / len(rs)
         sp = (statistics.mean(s_wall[r["cell"]] for r in rs)
               / statistics.mean(float(r["wall_clock"]) for r in rs))
         cost = (statistics.mean(float(r["tokens"]) for r in rs)
                 / statistics.mean(s_tok[r["cell"]] for r in rs))
         out[p] = (corr, sp, cost)
-    return out
+    return out, len(cells)
 
 
-def bar_panel(ax, vals, title, ylabel, fmt="{:.2f}", ylim=None, hline=None):
-    xs = range(len(PROTOCOL_ORDER))
+def bar_panel(ax, vals, title, ylabel, fmt="{:.2f}", ylim=None, hline=None,
+              labels=None):
+    xs = range(len(vals))
     ax.bar(xs, vals, width=0.58, color=BLUE, zorder=2)
     for x, v in zip(xs, vals):
         ax.text(x, v, fmt.format(v), ha="center", va="bottom", fontsize=8,
@@ -86,26 +89,39 @@ def main() -> int:
     ap.add_argument("--csv", default=str(ROOT / "results" / "matrix.csv"))
     ap.add_argument("--outdir", default=str(ROOT / "results" / "figures"))
     args = ap.parse_args()
-    got = load(Path(args.csv))
+    got, n_cells = load(Path(args.csv))
     outdir = Path(args.outdir)
     outdir.mkdir(parents=True, exist_ok=True)
 
     # --- Figure 5 redrawn from our data -----------------------------------
     fig, axes = plt.subplots(1, 4, figsize=(14, 3.4))
-    bar_panel(axes[0], [got[p][0] for p in PROTOCOL_ORDER],
-              "(a) Correctness", "Invariant-OK (%)", "{:.0f}", (0, 108))
-    bar_panel(axes[1], [got[p][1] for p in PROTOCOL_ORDER],
-              "(b) Speed", "Speedup vs serial", ylim=(0, 1.9), hline=1.0)
-    bar_panel(axes[2], [got[p][2] for p in PROTOCOL_ORDER],
-              "(c) Cost", "Cost vs serial", ylim=(0, 2.1), hline=1.0)
+    order = [q for q in PROTOCOL_ORDER if q in got]
+    bar_panel(axes[0], [got[p][0] for p in order],
+              "(a) Correctness", "Invariant-OK (%)", "{:.0f}", (0, 108),
+              labels=order)
+    bar_panel(axes[1], [got[p][1] for p in order],
+              "(b) Speed", "Speedup vs serial", ylim=(0, 1.9), hline=1.0,
+              labels=order)
+    bar_panel(axes[2], [got[p][2] for p in order],
+              "(c) Cost", "Cost vs serial", ylim=(0, 2.1), hline=1.0,
+              labels=order)
     ax = axes[3]
-    for p in PROTOCOL_ORDER:
+    placed = []
+    xr = (max(got[q][1] for q in order) - min(got[q][1] for q in order)) or 1.0
+    yr = (max(got[q][2] for q in order) - min(got[q][2] for q in order)) or 1.0
+    for p in order:
         subject = p == "MTPO"
         ax.scatter(got[p][1], got[p][2], s=150 if subject else 90,
                    color=BLUE, edgecolor="white", linewidth=2, zorder=3)
+        # drop a label below its point when it would collide with one already
+        # placed, so overlapping protocols stay readable
+        below = any(abs(got[p][1] - px) / xr < 0.16
+                    and abs(got[p][2] - py) / yr < 0.16 for px, py in placed)
         ax.annotate(p, (got[p][1], got[p][2]), textcoords="offset points",
-                    xytext=(0, 12), ha="center", fontsize=8, color=INK,
+                    xytext=(0, -16 if below else 12), ha="center", fontsize=8,
+                    color=INK, va="top" if below else "baseline",
                     fontweight="bold" if subject else "normal")
+        placed.append((got[p][1], got[p][2]))
     ax.set_xlabel("Speedup vs serial", fontsize=9, color=MUTED)
     ax.set_ylabel("Cost vs serial", fontsize=9, color=MUTED)
     ax.set_title("(d) Cost vs speed", fontsize=10)
@@ -118,20 +134,24 @@ def main() -> int:
     ax.tick_params(colors=MUTED)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     ax.set_axisbelow(True)
-    fig.suptitle("Figure 5 reproduced: five protocols on ten contended cells",
-                 fontsize=11)
+    fig.suptitle(f"Figure 5 reproduced: {len(order)} protocols on "
+                 f"{n_cells} cells", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.94))
     fig.savefig(outdir / "fig5_reproduction.png", dpi=170)
 
     # --- side-by-side with the paper's reported values --------------------
+    # This panel compares against the CoAgent paper, so it shows only the
+    # five protocols that paper reports. Certified chopping is a separate
+    # contribution and has its own figures.
+    paper_order = [q for q in order if q in PAPER]
     fig2, axes2 = plt.subplots(1, 3, figsize=(12, 3.5))
     titles = [("Correctness (%)", 0, "{:.0f}"), ("Speedup vs serial", 1, "{:.2f}"),
               ("Cost vs serial", 2, "{:.2f}")]
-    xs = range(len(PROTOCOL_ORDER))
+    xs = range(len(paper_order))
     for ax, (title, idx, fmt) in zip(axes2, titles):
         w = 0.38
-        pv = [PAPER[p][idx] for p in PROTOCOL_ORDER]
-        gv = [got[p][idx] for p in PROTOCOL_ORDER]
+        pv = [PAPER[p][idx] for p in paper_order]
+        gv = [got[p][idx] for p in paper_order]
         ax.bar([x - w / 2 for x in xs], pv, w, label="paper",
                color=ORANGE, edgecolor="none")
         ax.bar([x + w / 2 for x in xs], gv, w, label="reproduction",
@@ -143,7 +163,7 @@ def main() -> int:
             ax.text(x + w / 2, v, fmt.format(v), ha="center", va="bottom",
                     fontsize=7)
         ax.set_xticks(list(xs))
-        ax.set_xticklabels(PROTOCOL_ORDER, rotation=30, ha="right", fontsize=8)
+        ax.set_xticklabels(paper_order, rotation=30, ha="right", fontsize=8)
         ax.set_title(title, fontsize=10)
         ax.spines[["top", "right"]].set_visible(False)
     fig2.legend(*axes2[0].get_legend_handles_labels(), fontsize=8,

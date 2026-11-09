@@ -157,11 +157,13 @@ Real LLM Workers, 720 trials:
 | protocol | anomaly-free | speedup | token cost | rounds/trial |
 |---|---|---|---|---|
 | serial | 100% | 1.00 | 1.00 | 6.9 |
-| naive | 56% | 1.40 | 1.20 | 7.7 |
-| 2PL-saga | 96% | 0.93 | 1.17 | 8.5 |
-| OCC-saga | 88% | 0.78 | 1.90 | 12.3 |
-| MTPO | 93% | 1.36 | 1.19 | 7.7 |
-| **certified chopping** | **96%** | **1.18** | **1.02** | **7.1** |
+| naive | 56% | 1.45 | 1.19 | 7.7 |
+| 2PL-saga | 96% | 1.05 | 1.20 | 8.5 |
+| OCC-saga | 88% | 0.76 | 1.91 | 12.3 |
+| MTPO | 93% | 1.47 | 1.22 | 7.7 |
+| **certified chopping** | **96%** | **1.23** | **1.01** | **7.1** |
+
+![certified chopping](results/figures/fig_chopping.png)
 
 Best safety among concurrent policies, the only safe one that is also faster
 than serial, at essentially serial token cost, with zero deadlocks by
@@ -286,11 +288,13 @@ Real LLM Workers, 720 trials:
 | protocol | anomaly-free | speedup | token cost | rounds/trial |
 |---|---|---|---|---|
 | serial | 100% | 1.00 | 1.00 | 6.9 |
-| naive | 56% | 1.40 | 1.20 | 7.7 |
-| 2PL-saga | 96% | 0.93 | 1.17 | 8.5 |
-| OCC-saga | 88% | 0.78 | 1.90 | 12.3 |
-| MTPO | 93% | 1.36 | 1.19 | 7.7 |
-| **certified chopping** | **96%** | **1.18** | **1.02** | **7.1** |
+| naive | 56% | 1.45 | 1.19 | 7.7 |
+| 2PL-saga | 96% | 1.05 | 1.20 | 8.5 |
+| OCC-saga | 88% | 0.76 | 1.91 | 12.3 |
+| MTPO | 93% | 1.47 | 1.22 | 7.7 |
+| **certified chopping** | **96%** | **1.23** | **1.01** | **7.1** |
+
+![certified chopping](results/figures/fig_chopping.png)
 
 Best safety among concurrent policies, the only safe one that is also faster
 than serial, at essentially serial token cost, with zero deadlocks by
