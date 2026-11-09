@@ -122,7 +122,7 @@ def figure6(path: Path, outdir: Path) -> None:
     if not order:
         return
 
-    fig, axes = plt.subplots(len(order), 1, figsize=(11, 1.5 * len(order)),
+    fig, axes = plt.subplots(len(order), 1, figsize=(11, 1.5 * len(order) + 0.9),
                              sharex=True)
     if len(order) == 1:
         axes = [axes]
@@ -151,7 +151,14 @@ def figure6(path: Path, outdir: Path) -> None:
                 continue
             t, text = float(m.group(1)), m.group(2)
             if "notify" in text:
-                marks.append((t, "notify", "v", 2))
+                marks.append((t, "notify", "v", 3))
+            elif "certification merged" in text:
+                # a launch-time decision, not a mid-run event, but it is the
+                # thing that explains why this row looks like whole-workflow
+                # locking rather than a chopped run
+                marks.append((t, "certified: merged", "D", 4))
+            elif "REFUSED" in text:
+                marks.append((t, "revision REFUSED", "P", 4))
             elif "DEADLOCK" in text:
                 marks.append((t, "deadlock", "X", 1))
             elif "ABORT" in text or "validation" in text:
@@ -196,13 +203,15 @@ def figure6(path: Path, outdir: Path) -> None:
                    label="notification"),
         plt.Line2D([], [], marker="X", ls="", color=ORANGE,
                    label="deadlock / abort"),
+        plt.Line2D([], [], marker="D", ls="", color=ORANGE, markersize=6,
+                   label="certification merged pieces"),
     ]
-    fig.legend(handles=handles, fontsize=8, frameon=False, ncol=4,
-               loc="lower center", bbox_to_anchor=(0.5, -0.015))
+    fig.legend(handles=handles, fontsize=8, frameon=False,
+               loc="lower center", bbox_to_anchor=(0.5, 0.012), ncol=5)
     fig.suptitle(
         f"Figure 6, from real LLM Workers — k8s-canary under each protocol "
         f"({pick[order[0]]['model']})", fontsize=11)
-    fig.tight_layout(rect=(0, 0.05, 1, 0.95))
+    fig.tight_layout(rect=(0, 0.075, 1, 0.95))
     out = outdir / "fig6_llm.png"
     fig.savefig(out, dpi=170, facecolor="white")
     print(f"wrote {out}")

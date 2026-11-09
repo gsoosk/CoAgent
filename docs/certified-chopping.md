@@ -67,6 +67,14 @@ construction, against 2PL's 0.79 per trial in the simulated matrix.
 | `fig_chopping.png` | safety, speed, cost and the safety-vs-speed front against every other protocol |
 | `fig_chopping_where.png` | per-cell speedup over whole-workflow 2PL — where chopping pays and where it correctly collapses |
 | `fig_chopping_admission.png` | what certification decided, at launch and mid-flight |
+| `fig6_llm.png` | the case-study timeline, now including a chopping row |
+
+`fig6_llm.png` puts chopping on the same measured clock as the other five
+protocols on `k8s-canary`: **15.5 s, PASS**, with a diamond at t=0 marking
+certification merging three pieces at launch. The row then reads as
+whole-workflow locking — B idle until A releases — which is why it sits
+between MTPO (8.8 s) and 2PL (22.4 s) rather than winning outright on a cell
+whose structure forbids chopping.
 
 ## Where it pays and where it does not
 
