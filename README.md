@@ -224,6 +224,33 @@ MTPO's whole correctness claim rests on it. It is inside the interval.
 
 ![real LLM results](results/figures/llm_matrix.png)
 
+### The paper's own figures, rebuilt from real agents
+
+`scripts/make_paper_figures_llm.py` redraws the paper's Figure 5 and Figure 6
+with every number coming from real LLM Workers rather than the simulation.
+
+| | correctness | speedup | token cost |
+|---|---|---|---|
+| | LLM / paper | LLM / paper | LLM / paper |
+| serial | 100% / 98% | 1.00 / 1.00 | 1.00 / 1.00 |
+| naive | 45% / 13% | 1.29 / 1.54 | 1.26 / 1.06 |
+| 2PL-saga | 95% / 96% | 0.93 / 1.04 | 1.21 / 1.45 |
+| OCC-saga | 85% / 93% | 0.74 / 0.93 | 2.01 / 1.83 |
+| **MTPO** | **91% / 93%** | **1.25 / 1.43** | **1.24 / 1.15** |
+
+![Figure 5 from real agents](results/figures/fig5_llm.png)
+
+Figure 6 is a single `k8s-canary` run under each protocol on a **measured**
+clock — not a simulated one. The ordering the paper reports survives: MTPO
+8.8s, naive 13.5s (anomaly), serial 13.6s, 2PL 22.4s (deadlock), OCC 40.5s
+(abort plus full redo).
+
+![Figure 6 from real agents](results/figures/fig6_llm.png)
+
+Figure 7a is not rebuilt: it measures the ToolSmith's catalogue growth, which
+involves no Worker LLM, so a real-agent version needs a real ToolSmith agent —
+separate work.
+
 ## Adversarial review
 
 The implementation was reviewed adversarially after the first results were

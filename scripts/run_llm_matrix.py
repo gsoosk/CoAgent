@@ -197,6 +197,7 @@ def main() -> int:
                 "final_state": normalize(target.live),
                 "trace": rt.trace_lines,
                 "transcript": [a.transcript for a in agents],
+                "events": [e for a in agents for e in a.events],
             }
             results.append(rec)
             fh.write(json.dumps(rec, default=str) + "\n")

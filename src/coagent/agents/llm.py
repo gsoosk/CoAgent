@@ -89,6 +89,8 @@ class LLMAgent:
         self.refusals = 0
         self.unparsed = 0
         self.transcript: List[Dict[str, Any]] = []
+        # (agent, kind, label, t, dur) per dispatched call, for timelines
+        self.events: List[Dict[str, Any]] = []
 
     @property
     def model(self) -> str:
@@ -111,7 +113,8 @@ class LLMAgent:
             self.unparsed += 1
         self.messages.append({"role": "assistant",
                               "content": out.raw or json.dumps(out.parsed)})
-        self.transcript.append({"agent": self.name, "reply": out.parsed})
+        self.transcript.append({"agent": self.name, "reply": out.parsed,
+                                "latency": out.latency})
         return out
 
     def _drain(self, st: AgentState) -> None:
@@ -178,6 +181,11 @@ class LLMAgent:
                 label=f"{spec.name}({obj or prefix})",
                 prefix=prefix,
             )
+            # stamp the call with the virtual clock so the run can be drawn
+            self.events.append({
+                "agent": self.name, "kind": spec.kind.value,
+                "label": call.label, "t": rt.now, "dur": call.duration,
+            })
             result = yield call
             self.messages.append({
                 "role": "user",
