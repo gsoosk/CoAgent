@@ -68,6 +68,7 @@ construction, against 2PL's 0.79 per trial in the simulated matrix.
 | `fig_chopping_where.png` | per-cell speedup over whole-workflow 2PL — where chopping pays and where it correctly collapses |
 | `fig_chopping_admission.png` | what certification decided, at launch and mid-flight |
 | `fig6_llm.png` | the case-study timeline, now including a chopping row |
+| `fig6_chopping_vs_mtpo.png` | a lost update, where chopping beats MTPO on safety |
 
 `fig6_llm.png` puts chopping on the same measured clock as the other five
 protocols on `k8s-canary`: **15.5 s, PASS**, with a diamond at t=0 marking
@@ -75,6 +76,28 @@ certification merging three pieces at launch. The row then reads as
 whole-workflow locking — B idle until A releases — which is why it sits
 between MTPO (8.8 s) and 2PL (22.4 s) rather than winning outright on a cell
 whose structure forbids chopping.
+
+### Where chopping beats MTPO
+
+`fig6_chopping_vs_mtpo.png` is the same timeline on `k8s-replica-scale`, a
+lost update: both agents read replicas=4, A doubles it, B adds 3, and a
+serial run gives 11 or 14.
+
+Under MTPO, B writes 7 first. A's write of 8 arrives late and is correctly
+shadowed by the Thomas rule, and B is notified to recompute 8+3 — and does
+not. Final 7. MTPO's correctness here is *contingent on the agent's
+judgement* (assumption A3): 8/12 safe in the instrumented runs, 6/10 across
+the full matrix, and the failure mode is the premise-refresh-versus-re-read
+gap documented in the MTPO reproduction notes.
+
+Certified chopping merges the read-modify-write into a single piece, so the
+interleaving never exists to be misjudged: **10/10 safe**, at about 1.3x the
+wall clock. That is the difference in kind — MTPO repairs an anomaly after
+the fact and depends on the model to do it, while certification removes the
+schedule that produces it.
+
+Chopping is safer than MTPO on five of twelve cells and faster on two; the
+honest summary is that it buys structural safety with latency, not both.
 
 ## Where it pays and where it does not
 

@@ -91,7 +91,10 @@ def panel(ax, vals, title, ylabel, fmt="{:.2f}", ylim=None, hline=None,
     ax.set_axisbelow(True)
 
 
-def figure6(path: Path, outdir: Path) -> None:
+def timeline(path: Path, outdir: Path, cell_name: str = "k8s-canary",
+             outname: str = "fig6_llm.png", title: str = "",
+             prefer_anomalous=("naive",), caption: str = "",
+             lanes=("A (repair)", "B (canary)")) -> None:
     """The paper's Figure 6: one contended cell under each protocol.
 
     Rows are protocols, lanes within a row are the two agents, and marks are
@@ -102,8 +105,8 @@ def figure6(path: Path, outdir: Path) -> None:
     series.
     """
     rows = [json.loads(l) for l in open(path)]
-    refs = reference_states(CELLS["k8s-canary"])
-    cell = CELLS["k8s-canary"]
+    cell = CELLS[cell_name]
+    refs = reference_states(cell)
 
     def free(r):
         return bool(cell.anomaly_free(r["final_state"], refs))
@@ -113,11 +116,13 @@ def figure6(path: Path, outdir: Path) -> None:
         p = r["protocol"]
         # For naive the paper shows the anomaly firing, so prefer a trial
         # where it actually did; everything else takes the first run.
-        if p == "naive":
+        if p in prefer_anomalous:
+            # show the protocol failing, because that is the point of the row
             if p not in pick or (not free(r) and free(pick[p])):
                 pick[p] = r
         else:
-            pick.setdefault(p, r)
+            if p not in pick or (free(r) and not free(pick[p])):
+                pick[p] = r
     order = [p for p in PROTOCOL_ORDER if p in pick]
     if not order:
         return
@@ -180,7 +185,7 @@ def figure6(path: Path, outdir: Path) -> None:
                 fontsize=8.5, color=INK if free(r) else "#b00",
                 fontweight="bold")
         ax.set_yticks(list(lane.values()))
-        ax.set_yticklabels(["A (repair)" if a.endswith("0") else "B (canary)"
+        ax.set_yticklabels([lanes[0] if a.endswith("0") else lanes[1]
                             for a in agents], fontsize=8)
         ax.set_ylim(-0.8, len(agents) - 0.1)
         ax.set_xlim(-tmax * 0.012, tmax)
@@ -208,11 +213,14 @@ def figure6(path: Path, outdir: Path) -> None:
     ]
     fig.legend(handles=handles, fontsize=8, frameon=False,
                loc="lower center", bbox_to_anchor=(0.5, 0.012), ncol=5)
+    if caption:
+        axes[-1].annotate(caption, xy=(0.0, -0.95), xycoords="axes fraction",
+                          fontsize=8, color=MUTED, style="italic", va="top")
     fig.suptitle(
-        f"Figure 6, from real LLM Workers — k8s-canary under each protocol "
-        f"({pick[order[0]]['model']})", fontsize=11)
+        title or (f"Figure 6, from real LLM Workers — {cell_name} under each "
+                  f"protocol ({pick[order[0]]['model']})"), fontsize=11)
     fig.tight_layout(rect=(0, 0.075, 1, 0.95))
-    out = outdir / "fig6_llm.png"
+    out = outdir / outname
     fig.savefig(out, dpi=170, facecolor="white")
     print(f"wrote {out}")
 
@@ -324,10 +332,31 @@ def main() -> int:
               f"{f'{speed[i]:.2f} / {ps:.2f}':>16}"
               f"{f'{cost[i]:.2f} / {pct:.2f}':>16}")
 
+    print()
     cs = ROOT / "results" / "llm_casestudy.jsonl"
     if cs.exists():
-        print()
-        figure6(cs, Path(args.outdir))
+        timeline(cs, Path(args.outdir))
+    cs2 = ROOT / "results" / "llm_casestudy2.jsonl"
+    if cs2.exists():
+        timeline(
+            cs2, Path(args.outdir), cell_name="k8s-replica-scale",
+            outname="fig6_chopping_vs_mtpo.png",
+            title="A lost update: where certified chopping beats MTPO "
+                  "(k8s-replica-scale, claude-haiku-4-5)",
+            prefer_anomalous=("naive", "MTPO"),
+            lanes=("A (doubles)", "B (adds 3)"),
+            caption=(
+                "Both agents read replicas=4; A doubles it, B adds 3. Serial "
+                "gives 11 or 14.\n"
+                "MTPO: B writes 7 first, A's 8 arrives late and is correctly "
+                "shadowed (Thomas rule), B is notified to recompute 8+3 — and "
+                "does not. Final 7.\n"
+                "Its correctness is contingent on the agent's judgement (A3): "
+                "8/12 safe here, 6/10 across the matrix.\n"
+                "Certified chopping merges the read-modify-write into one "
+                "piece, so the interleaving never exists to be misjudged: "
+                "10/10 safe, at ~1.3x the wall clock."),
+        )
     return 0
 
 
