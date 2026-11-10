@@ -227,9 +227,18 @@ def timeline(path: Path, outdir: Path, cell_name: str = "k8s-canary",
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default=str(ROOT / "results" / "llm_runs.jsonl"))
-    ap.add_argument("--outdir", default=str(ROOT / "results" / "figures"))
+    ap.add_argument("--dir", default="haiku",
+                    help="results subfolder for one model: "
+                         "sets both the runs file and the "
+                         "figure output directory")
+    ap.add_argument("--runs", default=None)
+    ap.add_argument("--outdir", default=None)
     args = ap.parse_args()
+    base = ROOT / "results" / args.dir
+    if args.runs is None:
+        args.runs = str(base / "llm_runs.jsonl")
+    if getattr(args, "outdir", None) is None:
+        args.outdir = str(base / "figures")
 
     runs = [json.loads(l) for l in open(args.runs)]
     model = runs[-1].get("model", "?")
@@ -333,10 +342,10 @@ def main() -> int:
               f"{f'{cost[i]:.2f} / {pct:.2f}':>16}")
 
     print()
-    cs = ROOT / "results" / "llm_casestudy.jsonl"
+    cs = ROOT / "results" / args.dir / "llm_casestudy.jsonl"
     if cs.exists():
         timeline(cs, Path(args.outdir))
-    cs2 = ROOT / "results" / "llm_casestudy2.jsonl"
+    cs2 = ROOT / "results" / args.dir / "llm_casestudy2.jsonl"
     if cs2.exists():
         timeline(
             cs2, Path(args.outdir), cell_name="k8s-replica-scale",

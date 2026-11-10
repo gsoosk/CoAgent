@@ -53,10 +53,19 @@ def wilson(k, n, z=1.96):
 
 def main() -> int:
     ap = argparse.ArgumentParser()
-    ap.add_argument("--runs", default=str(ROOT / "results" / "llm_runs.jsonl"))
-    ap.add_argument("--out", default=str(ROOT / "results" / "figures"))
+    ap.add_argument("--dir", default="haiku",
+                    help="results subfolder for one model: "
+                         "sets both the runs file and the "
+                         "figure output directory")
+    ap.add_argument("--runs", default=None)
+    ap.add_argument("--out", default=None)
     ap.add_argument("--min-trials", type=int, default=5)
     args = ap.parse_args()
+    base = ROOT / "results" / args.dir
+    if args.runs is None:
+        args.runs = str(base / "llm_runs.jsonl")
+    if getattr(args, "outdir", None) is None:
+        args.outdir = str(base / "figures")
 
     runs = [json.loads(l) for l in open(args.runs)]
     model = runs[-1].get("model", "?")
