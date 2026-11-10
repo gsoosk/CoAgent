@@ -1,0 +1,114 @@
+provider   anthropic
+model      claude-sonnet-5
+cells      12  protocols 6  trials 10
+to run     92 trials (628 already done)
+estimated  $9.66  (~$0.1050/trial)
+           thinking tokens bill as output and are NOT in that estimate
+
+wb-crm-dedupe            OCC-saga   seed=8 PASS notif=0 rounds=15 $0.0293
+wb-crm-dedupe            OCC-saga   seed=9 PASS notif=0 rounds=16 $0.0321
+wb-crm-dedupe            MTPO       seed=0 PASS notif=1 rounds=8 $0.0149
+wb-crm-dedupe            MTPO       seed=1 PASS notif=1 rounds=9 $0.0173
+wb-crm-dedupe            MTPO       seed=2 PASS notif=1 rounds=8 $0.0146
+wb-crm-dedupe            MTPO       seed=3 PASS notif=1 rounds=8 $0.0149
+wb-crm-dedupe            MTPO       seed=4 PASS notif=1 rounds=9 $0.0174
+wb-crm-dedupe            MTPO       seed=5 PASS notif=1 rounds=8 $0.0149
+wb-crm-dedupe            MTPO       seed=6 PASS notif=1 rounds=8 $0.0145
+wb-crm-dedupe            MTPO       seed=7 PASS notif=1 rounds=8 $0.0145
+wb-crm-dedupe            MTPO       seed=8 PASS notif=1 rounds=8 $0.0155
+wb-crm-dedupe            MTPO       seed=9 PASS notif=1 rounds=8 $0.0151
+wb-crm-dedupe            chopping   seed=0 PASS notif=0 rounds=8 $0.0139
+wb-crm-dedupe            chopping   seed=1 PASS notif=0 rounds=8 $0.0141
+wb-crm-dedupe            chopping   seed=2 PASS notif=0 rounds=8 $0.0138
+wb-crm-dedupe            chopping   seed=3 PASS notif=0 rounds=8 $0.0138
+wb-crm-dedupe            chopping   seed=4 PASS notif=0 rounds=8 $0.0137
+wb-crm-dedupe            chopping   seed=5 PASS notif=0 rounds=8 $0.0142
+wb-crm-dedupe            chopping   seed=6 PASS notif=0 rounds=8 $0.0140
+wb-crm-dedupe            chopping   seed=7 PASS notif=0 rounds=8 $0.0141
+wb-crm-dedupe            chopping   seed=8 PASS notif=0 rounds=8 $0.0141
+wb-crm-dedupe            chopping   seed=9 PASS notif=0 rounds=8 $0.0139
+wb-calendar-doublebook   serial     seed=0 PASS notif=0 rounds=6 $0.0089
+wb-calendar-doublebook   serial     seed=1 PASS notif=0 rounds=6 $0.0093
+wb-calendar-doublebook   serial     seed=2 PASS notif=0 rounds=6 $0.0098
+wb-calendar-doublebook   serial     seed=3 PASS notif=0 rounds=6 $0.0088
+wb-calendar-doublebook   serial     seed=4 PASS notif=0 rounds=6 $0.0094
+wb-calendar-doublebook   serial     seed=5 PASS notif=0 rounds=6 $0.0097
+wb-calendar-doublebook   serial     seed=6 PASS notif=0 rounds=6 $0.0090
+wb-calendar-doublebook   serial     seed=7 PASS notif=0 rounds=6 $0.0087
+wb-calendar-doublebook   serial     seed=8 PASS notif=0 rounds=6 $0.0093
+wb-calendar-doublebook   serial     seed=9 PASS notif=0 rounds=6 $0.0091
+wb-calendar-doublebook   naive      seed=0 FAIL notif=0 rounds=6 $0.0089
+wb-calendar-doublebook   naive      seed=1 FAIL notif=0 rounds=6 $0.0089
+wb-calendar-doublebook   naive      seed=2 FAIL notif=0 rounds=6 $0.0089
+wb-calendar-doublebook   naive      seed=3 FAIL notif=0 rounds=6 $0.0091
+wb-calendar-doublebook   naive      seed=4 FAIL notif=0 rounds=6 $0.0097
+wb-calendar-doublebook   naive      seed=5 FAIL notif=0 rounds=6 $0.0092
+wb-calendar-doublebook   naive      seed=6 FAIL notif=0 rounds=6 $0.0096
+wb-calendar-doublebook   naive      seed=7 FAIL notif=0 rounds=6 $0.0090
+wb-calendar-doublebook   naive      seed=8 FAIL notif=0 rounds=6 $0.0096
+wb-calendar-doublebook   naive      seed=9 FAIL notif=0 rounds=6 $0.0086
+wb-calendar-doublebook   2PL-saga   seed=0 PASS notif=0 rounds=8 $0.0124
+wb-calendar-doublebook   2PL-saga   seed=1 PASS notif=0 rounds=8 $0.0125
+wb-calendar-doublebook   2PL-saga   seed=2 PASS notif=0 rounds=8 $0.0124
+wb-calendar-doublebook   2PL-saga   seed=3 PASS notif=0 rounds=8 $0.0125
+wb-calendar-doublebook   2PL-saga   seed=4 PASS notif=0 rounds=8 $0.0129
+wb-calendar-doublebook   2PL-saga   seed=5 PASS notif=0 rounds=8 $0.0124
+wb-calendar-doublebook   2PL-saga   seed=6 PASS notif=0 rounds=8 $0.0125
+wb-calendar-doublebook   2PL-saga   seed=7 PASS notif=0 rounds=8 $0.0126
+wb-calendar-doublebook   2PL-saga   seed=8 PASS notif=0 rounds=8 $0.0116
+wb-calendar-doublebook   2PL-saga   seed=9 PASS notif=0 rounds=8 $0.0124
+wb-calendar-doublebook   OCC-saga   seed=0 PASS notif=0 rounds=9 $0.0141
+wb-calendar-doublebook   OCC-saga   seed=1 FAIL notif=0 rounds=9 $0.0141
+wb-calendar-doublebook   OCC-saga   seed=2 FAIL notif=0 rounds=9 $0.0136
+wb-calendar-doublebook   OCC-saga   seed=3 PASS notif=0 rounds=9 $0.0142
+wb-calendar-doublebook   OCC-saga   seed=4 FAIL notif=0 rounds=9 $0.0139
+wb-calendar-doublebook   OCC-saga   seed=5 PASS notif=0 rounds=9 $0.0133
+wb-calendar-doublebook   OCC-saga   seed=6 PASS notif=0 rounds=9 $0.0132
+wb-calendar-doublebook   OCC-saga   seed=7 PASS notif=0 rounds=9 $0.0137
+wb-calendar-doublebook   OCC-saga   seed=8 PASS notif=0 rounds=9 $0.0128
+wb-calendar-doublebook   OCC-saga   seed=9 PASS notif=0 rounds=9 $0.0139
+wb-calendar-doublebook   MTPO       seed=0 PASS notif=1 rounds=6 $0.0101
+wb-calendar-doublebook   MTPO       seed=1 PASS notif=1 rounds=6 $0.0104
+wb-calendar-doublebook   MTPO       seed=2 PASS notif=1 rounds=7 $0.0140
+wb-calendar-doublebook   MTPO       seed=3 PASS notif=1 rounds=6 $0.0106
+wb-calendar-doublebook   MTPO       seed=4 PASS notif=1 rounds=6 $0.0099
+wb-calendar-doublebook   MTPO       seed=5 PASS notif=1 rounds=7 $0.0134
+wb-calendar-doublebook   MTPO       seed=6 PASS notif=1 rounds=7 $0.0137
+wb-calendar-doublebook   MTPO       seed=7 PASS notif=1 rounds=7 $0.0136
+wb-calendar-doublebook   MTPO       seed=8 PASS notif=1 rounds=7 $0.0128
+wb-calendar-doublebook   MTPO       seed=9 PASS notif=1 rounds=7 $0.0130
+wb-calendar-doublebook   chopping   seed=0 PASS notif=0 rounds=6 $0.0096
+wb-calendar-doublebook   chopping   seed=1 PASS notif=0 rounds=6 $0.0092
+wb-calendar-doublebook   chopping   seed=2 PASS notif=0 rounds=6 $0.0089
+wb-calendar-doublebook   chopping   seed=3 PASS notif=0 rounds=6 $0.0087
+wb-calendar-doublebook   chopping   seed=4 PASS notif=0 rounds=6 $0.0096
+wb-calendar-doublebook   chopping   seed=5 PASS notif=0 rounds=6 $0.0092
+wb-calendar-doublebook   chopping   seed=6 PASS notif=0 rounds=6 $0.0094
+wb-calendar-doublebook   chopping   seed=7 PASS notif=0 rounds=6 $0.0098
+wb-calendar-doublebook   chopping   seed=8 PASS notif=0 rounds=6 $0.0091
+wb-calendar-doublebook   chopping   seed=9 PASS notif=0 rounds=6 $0.0094
+wb-email-triage          serial     seed=0 PASS notif=0 rounds=7 $0.0117
+wb-email-triage          serial     seed=1 PASS notif=0 rounds=7 $0.0120
+wb-email-triage          serial     seed=2 PASS notif=0 rounds=7 $0.0120
+wb-email-triage          serial     seed=3 PASS notif=0 rounds=7 $0.0120
+wb-email-triage          serial     seed=4 PASS notif=0 rounds=7 $0.0122
+wb-email-triage          serial     seed=5 PASS notif=0 rounds=7 $0.0125
+wb-email-triage          serial     seed=6 PASS notif=0 rounds=7 $0.0121
+wb-email-triage          serial     seed=7 PASS notif=0 rounds=7 $0.0120
+wb-email-triage          serial     seed=9 PASS notif=0 rounds=7 $0.0117
+wb-email-triage          2PL-saga   seed=4 PASS notif=0 rounds=7 $0.0121
+
+====================================================================
+protocol    correct  trials  notif  acted on  rounds/trial   $/trial
+--------------------------------------------------------------------
+serial         100%      19      0         0           6.5    0.0105
+naive            0%      10      0         0           6.0    0.0092
+2PL-saga       100%      11      0         0           7.9    0.0124
+OCC-saga        75%      12      0         0          10.1    0.0165
+MTPO           100%      20     20         8           7.4    0.0138
+chopping       100%      20      0         0           7.0    0.0116
+
+serial - MTPO = 0 points   (paper: 5)
+  that gap is the A3 (self-healing) cost; the level also carries A1.
+
+total spend $1.134  -> results/sonnet/llm_runs.jsonl

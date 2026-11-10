@@ -121,19 +121,33 @@ def main() -> int:
         usd = f"{a['usd']:.4f} / {b['usd']:.4f}"
         print(f"{p:10}{safe:>26}{ok:>16}{sp:>16}{usd:>16}")
 
-    print()
-    for tag, by_, scope_ in ((args.a, by_a, scope), (args.b, by_b, scope)):
+    # A1/A3 on two scopes. The shared scope is the only honest basis for
+    # comparing the models, but it is the intersection, so a cell excluded
+    # in either run disappears -- including cells where the other model
+    # produced the run's most interesting result. Reporting the shared
+    # scope alone would quote an A3 that each model's own data contradicts.
+    def assumptions(by_, scope_):
         ser = [r for c in scope_ for r in by_[(c, "serial")]]
         mt = [r for c in scope_ for r in by_[(c, "MTPO")] if r["notifications"]]
         healed = sum(1 for r in mt if free(r))
         a1 = 100 * sum(r["invariant_ok"] for r in ser) / max(len(ser), 1)
-        line = f"{tag:8} A1 {a1:3.0f}%"
+        out = f"A1 {a1:3.0f}%"
         if mt:
             _, lo, hi = wilson(healed, len(mt))
-            line += (f"   A3 {healed}/{len(mt)} = "
-                     f"{100*healed/len(mt):.0f}% [{lo*100:.0f}, {hi*100:.0f}]")
-        print(line)
-    print("paper   A1  98%   A3 assumed 95%")
+            out += (f"   A3 {healed}/{len(mt)} = "
+                    f"{100*healed/len(mt):.0f}% [{lo*100:.0f}, {hi*100:.0f}]")
+        return out
+
+    print()
+    print(f"shared scope ({len(scope)} cells) -- the model comparison")
+    for tag, by_ in ((args.a, by_a), (args.b, by_b)):
+        print(f"  {tag:8} {assumptions(by_, scope)}")
+    print()
+    print("own scope -- each model on every cell its own run can score")
+    for tag, by_, cl in ((args.a, by_a, clean_a), (args.b, by_b, clean_b)):
+        print(f"  {tag:8} {assumptions(by_, cl)}   ({len(cl)} cells)")
+    print()
+    print("  paper    A1  98%   A3 assumed 95%")
     return 0
 
 

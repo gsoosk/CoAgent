@@ -64,8 +64,10 @@ def main() -> int:
     base = ROOT / "results" / args.dir
     if args.runs is None:
         args.runs = str(base / "llm_runs.jsonl")
-    if getattr(args, "outdir", None) is None:
-        args.outdir = str(base / "figures")
+    # --out is what the write path below reads; --dir has to fill it in, or
+    # the figure lands on a None path.
+    if args.out is None:
+        args.out = str(base / "figures")
 
     runs = [json.loads(l) for l in open(args.runs)]
     model = runs[-1].get("model", "?")

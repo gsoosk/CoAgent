@@ -184,7 +184,14 @@ class AnthropicBackend:
         key = load_key("ANTHROPIC_API_KEY")
         # A bare client also resolves an `ant auth login` profile, so only
         # fail when neither a key nor a profile is available.
-        self.client = anthropic.Anthropic(api_key=key) if key else anthropic.Anthropic()
+        # max_retries=0: the SDK's own retries happen *inside* one
+        # client.messages.create() call, so their wait would land in the
+        # latency this backend measures and feeds to the runtime as a step
+        # duration. Retrying here instead keeps the recorded latency equal to
+        # the attempt that actually succeeded.
+        self.client = (anthropic.Anthropic(api_key=key, max_retries=0) if key
+                       else anthropic.Anthropic(max_retries=0))
+        self._anthropic = anthropic
 
     # Haiku 4.5 and older models reject `output_config.effort`, and take
     # thinking as {"type": "enabled", budget_tokens: N} rather than adaptive.
@@ -193,6 +200,29 @@ class AnthropicBackend:
     @property
     def _legacy(self) -> bool:
         return any(tag in self.model for tag in self.LEGACY)
+
+    # Overload and rate-limit responses were aborting whole trials, and a
+    # dropped trial is worse than a slow one: the runs that fail are the
+    # longer, harder ones, so deleting them biases the sample. Per-cell
+    # medians absorb one slow trial; they cannot recover a missing one.
+    RETRIES, BACKOFF = 5, 2.0
+
+    def _create_with_retry(self, kwargs: Dict[str, Any]):
+        a = self._anthropic
+        transient = (a.RateLimitError, a.InternalServerError,
+                     a.APIConnectionError, a.APITimeoutError)
+        for attempt in range(self.RETRIES):
+            t0 = time.time()
+            try:
+                return self.client.messages.create(**kwargs), time.time() - t0
+            except transient as exc:
+                if attempt == self.RETRIES - 1:
+                    raise
+                wait = self.BACKOFF ** attempt
+                print(f"    retry {attempt + 1}/{self.RETRIES - 1} after "
+                      f"{type(exc).__name__}; sleeping {wait:.0f}s", flush=True)
+                time.sleep(wait)
+        raise RuntimeError("unreachable")
 
     def complete(self, system: str, messages: List[Dict[str, str]]) -> Completion:
         kwargs: Dict[str, Any] = {
@@ -210,9 +240,7 @@ class AnthropicBackend:
             kwargs["output_config"] = {"effort": self.effort}
             if self.thinking:
                 kwargs["thinking"] = {"type": "adaptive"}
-        t0 = time.time()
-        resp = self.client.messages.create(**kwargs)
-        latency = time.time() - t0
+        resp, latency = self._create_with_retry(kwargs)
         text = "".join(
             b.text for b in resp.content if getattr(b, "type", "") == "text"
         )

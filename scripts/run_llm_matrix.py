@@ -192,7 +192,11 @@ def main() -> int:
             try:
                 rt.run()
             except Exception as exc:                      # noqa: BLE001
-                print(f"{cell_name}/{proto}/{seed}: run failed: {exc}")
+                # Name the type: a dropped trial is invisible in the output
+                # file, so this line is the only record of why it went
+                # missing, and 429-vs-400-vs-bug changes what to do about it.
+                print(f"{cell_name}/{proto}/{seed}: run failed: "
+                      f"{type(exc).__name__}: {exc}", flush=True)
                 continue
 
             ok = invariant_ok(target.live, refs, cell)
