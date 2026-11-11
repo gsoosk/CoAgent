@@ -220,56 +220,58 @@ def figure_where(by, have, outdir):
 
 
 def figure_where_prio(by, have, model, outdir):
-    """Per-cell speedup over whole-workflow 2PL: chopping vs chopping-prio.
+    """Per-cell speedup over whole-workflow 2PL, for each chopping variant.
 
-    Both series share the 2PL baseline, so the pair reads as one comparison
-    rather than two charts: where the bars sit says whether releasing locks
-    inside a piece paid, and the gap between them is what priority ordering
-    added on top.
+    All three series share the 2PL baseline, so the chart reads as one
+    comparison. chopping-2pl sitting on the 1.0 line is the point of the
+    figure as much as chopping-prio clearing it: on a contended cell
+    certification coarsens the workflow into a single maximal piece, and
+    2PL inside a piece that spans everything is just 2PL.
     """
-    variant = "chopping-prio"
-    if not any(k[1] == variant for k in by):
+    series = [("chopping", "certified chopping", BLUE),
+              ("chopping-2pl", "chopping-2pl (incremental locks)", AQUA),
+              ("chopping-prio", "chopping-prio (sigma-ordered)", ORANGE)]
+    series = [s for s in series if any(k[1] == s[0] for k in by)]
+    if len(series) < 2:
         return
 
     rows = []
     for c in have:
         s2 = statistics.median(x["wall"] for x in by[(c, "2PL-saga")])
-        rows.append((
-            c,
-            s2 / statistics.median(x["wall"] for x in by[(c, SUBJECT)]),
-            s2 / statistics.median(x["wall"] for x in by[(c, variant)]),
-        ))
-    rows.sort(key=lambda r: -r[2])
+        rows.append((c, [s2 / statistics.median(x["wall"] for x in by[(c, p)])
+                         for p, _, _ in series]))
+    rows.sort(key=lambda r: -r[1][-1])
 
-    fig, ax = plt.subplots(figsize=(9.4, 5.0))
+    n = len(series)
+    fig, ax = plt.subplots(figsize=(9.8, 0.185 * len(rows) * n + 1.5))
     ys = range(len(rows))
-    h = 0.36
-    ax.barh([y - h / 2 for y in ys], [r[1] for r in rows], height=h,
-            color=BLUE, zorder=2, label="certified chopping")
-    ax.barh([y + h / 2 for y in ys], [r[2] for r in rows], height=h,
-            color=ORANGE, zorder=2, label="chopping-prio")
-    for y, (_, a, b) in zip(ys, rows):
-        ax.text(a + 0.02, y - h / 2, f"{a:.2f}x", va="center", fontsize=7.6,
-                color=INK)
-        ax.text(b + 0.02, y + h / 2, f"{b:.2f}x", va="center", fontsize=7.6,
-                color=INK, fontweight="bold" if b > a else "normal")
-    ax.axvline(1.0, color=MUTED, lw=1, ls="--", zorder=1)
+    h = 0.78 / n
+    for k, (_, label, col) in enumerate(series):
+        off = (k - (n - 1) / 2) * h
+        ax.barh([y + off for y in ys], [r[1][k] for r in rows], height=h,
+                color=col, zorder=2, label=label)
+        for y, r in zip(ys, rows):
+            v = r[1][k]
+            ax.text(v + 0.02, y + off, f"{v:.2f}x", va="center", fontsize=7.2,
+                    color=INK,
+                    fontweight="bold" if v == max(r[1]) else "normal")
+    ax.axvline(1.0, color=MUTED, lw=1.2, ls="--", zorder=1)
     ax.set_yticks(list(ys))
     ax.set_yticklabels([r[0] for r in rows], fontsize=8.5)
     ax.invert_yaxis()
     ax.set_xlabel("speedup over whole-workflow 2PL", fontsize=9, color=MUTED)
-    ax.set_title("What priority ordering adds, cell by cell — "
+    ax.set_title("What each locking discipline adds, cell by cell — "
                  f"{model}", fontsize=10.5)
-    ax.annotate("left of the dashed line, the protocol is slower than 2PL",
-                xy=(0.015, 0.012), xycoords="axes fraction", fontsize=8,
+    ax.annotate("on the dashed line = no better than 2PL",
+                xy=(0.015, 0.008), xycoords="axes fraction", fontsize=8,
                 color=MUTED, style="italic")
-    ax.legend(fontsize=8.5, frameon=False, loc="lower right")
+    ax.legend(fontsize=8.2, frameon=False, loc="lower right")
     ax.spines[["top", "right", "left"]].set_visible(False)
     ax.spines["bottom"].set_color(GRID)
     ax.tick_params(colors=MUTED, length=0)
     ax.xaxis.grid(True, color=GRID, lw=0.8, zorder=0)
     ax.set_axisbelow(True)
-    ax.set_xlim(0, max(max(r[1], r[2]) for r in rows) * 1.12)
+    ax.set_xlim(0, max(max(r[1]) for r in rows) * 1.14)
     fig.tight_layout()
     fig.savefig(outdir / "fig_prio_where.png", dpi=170, facecolor="white")
     print(f"wrote {outdir / 'fig_prio_where.png'}")

@@ -1,0 +1,108 @@
+provider   anthropic
+model      claude-haiku-4-5
+cells      12  protocols 1  trials 10
+to run     94 trials (866 already done)
+estimated  $4.94  (~$0.0525/trial)
+           thinking tokens bill as output and are NOT in that estimate
+
+k8s-permission-revoke    chopping-2pl seed=6 PASS notif=0 rounds=10 $0.0155
+k8s-permission-revoke    chopping-2pl seed=7 PASS notif=0 rounds=11 $0.0156
+k8s-permission-revoke    chopping-2pl seed=8 FAIL notif=0 rounds=11 $0.0438
+k8s-permission-revoke    chopping-2pl seed=9 PASS notif=0 rounds=11 $0.0201
+k8s-replica-scale        chopping-2pl seed=0 PASS notif=0 rounds=8 $0.0106
+k8s-replica-scale        chopping-2pl seed=1 PASS notif=0 rounds=8 $0.0098
+k8s-replica-scale        chopping-2pl seed=2 PASS notif=0 rounds=8 $0.0105
+k8s-replica-scale        chopping-2pl seed=3 PASS notif=0 rounds=9 $0.0121
+k8s-replica-scale        chopping-2pl seed=4 PASS notif=0 rounds=8 $0.0091
+k8s-replica-scale        chopping-2pl seed=5 PASS notif=0 rounds=8 $0.0106
+k8s-replica-scale        chopping-2pl seed=6 PASS notif=0 rounds=8 $0.0126
+k8s-replica-scale        chopping-2pl seed=7 PASS notif=0 rounds=8 $0.0107
+k8s-replica-scale        chopping-2pl seed=8 PASS notif=0 rounds=8 $0.0089
+k8s-replica-scale        chopping-2pl seed=9 PASS notif=0 rounds=8 $0.0090
+k8s-rollback-audit       chopping-2pl seed=0 PASS notif=0 rounds=7 $0.0097
+k8s-rollback-audit       chopping-2pl seed=1 FAIL notif=0 rounds=5 $0.0092
+k8s-rollback-audit       chopping-2pl seed=2 PASS notif=0 rounds=7 $0.0098
+k8s-rollback-audit       chopping-2pl seed=3 FAIL notif=0 rounds=5 $0.0084
+k8s-rollback-audit       chopping-2pl seed=4 PASS notif=0 rounds=7 $0.0093
+k8s-rollback-audit       chopping-2pl seed=5 FAIL notif=0 rounds=5 $0.0096
+k8s-rollback-audit       chopping-2pl seed=6 PASS notif=0 rounds=7 $0.0131
+k8s-rollback-audit       chopping-2pl seed=7 FAIL notif=0 rounds=6 $0.0118
+k8s-rollback-audit       chopping-2pl seed=8 PASS notif=0 rounds=7 $0.0103
+k8s-rollback-audit       chopping-2pl seed=9 FAIL notif=0 rounds=5 $0.0091
+wb-crm-dedupe            chopping-2pl seed=0 PASS notif=0 rounds=10 $0.0157
+wb-crm-dedupe            chopping-2pl seed=1 PASS notif=0 rounds=10 $0.0144
+wb-crm-dedupe            chopping-2pl seed=2 PASS notif=0 rounds=10 $0.0147
+wb-crm-dedupe            chopping-2pl seed=3 PASS notif=0 rounds=10 $0.0162
+wb-crm-dedupe            chopping-2pl seed=4 PASS notif=0 rounds=10 $0.0140
+wb-crm-dedupe            chopping-2pl seed=5 PASS notif=0 rounds=10 $0.0138
+wb-crm-dedupe            chopping-2pl seed=6 FAIL notif=0 rounds=10 $0.0177
+wb-crm-dedupe            chopping-2pl seed=7 FAIL notif=0 rounds=8 $0.0176
+wb-crm-dedupe            chopping-2pl seed=8 FAIL notif=0 rounds=9 $0.0161
+wb-crm-dedupe            chopping-2pl seed=9 FAIL notif=0 rounds=11 $0.0262
+wb-calendar-doublebook   chopping-2pl seed=0 PASS notif=0 rounds=8 $0.0103
+wb-calendar-doublebook   chopping-2pl seed=1 PASS notif=0 rounds=8 $0.0123
+wb-calendar-doublebook   chopping-2pl seed=2 PASS notif=0 rounds=8 $0.0096
+wb-calendar-doublebook   chopping-2pl seed=3 PASS notif=0 rounds=8 $0.0134
+wb-calendar-doublebook   chopping-2pl seed=4 PASS notif=0 rounds=8 $0.0102
+wb-calendar-doublebook   chopping-2pl seed=5 PASS notif=0 rounds=8 $0.0118
+wb-calendar-doublebook   chopping-2pl seed=6 PASS notif=0 rounds=8 $0.0122
+wb-calendar-doublebook   chopping-2pl seed=7 PASS notif=0 rounds=8 $0.0137
+wb-calendar-doublebook   chopping-2pl seed=8 PASS notif=0 rounds=8 $0.0120
+wb-calendar-doublebook   chopping-2pl seed=9 PASS notif=0 rounds=8 $0.0126
+wb-email-triage          chopping-2pl seed=0 FAIL notif=0 rounds=6 $0.0109
+wb-email-triage          chopping-2pl seed=1 PASS notif=0 rounds=8 $0.0149
+wb-email-triage          chopping-2pl seed=2 FAIL notif=0 rounds=5 $0.0084
+wb-email-triage          chopping-2pl seed=3 PASS notif=0 rounds=7 $0.0097
+wb-email-triage          chopping-2pl seed=4 PASS notif=0 rounds=8 $0.0156
+wb-email-triage          chopping-2pl seed=5 FAIL notif=0 rounds=5 $0.0092
+wb-email-triage          chopping-2pl seed=6 PASS notif=0 rounds=7 $0.0097
+wb-email-triage          chopping-2pl seed=7 FAIL notif=0 rounds=6 $0.0112
+wb-email-triage          chopping-2pl seed=8 PASS notif=0 rounds=7 $0.0092
+wb-email-triage          chopping-2pl seed=9 PASS notif=0 rounds=7 $0.0097
+wb-analytics-restate     chopping-2pl seed=0 PASS notif=0 rounds=11 $0.0177
+wb-analytics-restate     chopping-2pl seed=1 PASS notif=0 rounds=12 $0.0331
+wb-analytics-restate     chopping-2pl seed=2 PASS notif=0 rounds=10 $0.0167
+wb-analytics-restate     chopping-2pl seed=3 PASS notif=0 rounds=10 $0.0149
+wb-analytics-restate     chopping-2pl seed=4 PASS notif=0 rounds=10 $0.0165
+wb-analytics-restate     chopping-2pl seed=5 FAIL notif=0 rounds=10 $0.0172
+wb-analytics-restate     chopping-2pl seed=6 PASS notif=0 rounds=10 $0.0163
+wb-analytics-restate     chopping-2pl seed=7 FAIL notif=0 rounds=9 $0.0233
+wb-analytics-restate     chopping-2pl seed=8 PASS notif=0 rounds=10 $0.0208
+wb-analytics-restate     chopping-2pl seed=9 PASS notif=0 rounds=14 $0.0449
+wb-project-rebalance     chopping-2pl seed=0 PASS notif=0 rounds=8 $0.0115
+wb-project-rebalance     chopping-2pl seed=1 PASS notif=0 rounds=8 $0.0118
+wb-project-rebalance     chopping-2pl seed=2 PASS notif=0 rounds=8 $0.0092
+wb-project-rebalance     chopping-2pl seed=3 PASS notif=0 rounds=8 $0.0112
+wb-project-rebalance     chopping-2pl seed=4 PASS notif=0 rounds=8 $0.0105
+wb-project-rebalance     chopping-2pl seed=5 PASS notif=0 rounds=8 $0.0104
+wb-project-rebalance     chopping-2pl seed=6 PASS notif=0 rounds=8 $0.0118
+wb-project-rebalance     chopping-2pl seed=7 PASS notif=0 rounds=8 $0.0107
+wb-project-rebalance     chopping-2pl seed=8 PASS notif=0 rounds=8 $0.0109
+wb-project-rebalance     chopping-2pl seed=9 PASS notif=0 rounds=8 $0.0115
+cc-claim                 chopping-2pl seed=0 PASS notif=0 rounds=6 $0.0070
+cc-claim                 chopping-2pl seed=1 PASS notif=0 rounds=6 $0.0067
+cc-claim                 chopping-2pl seed=2 FAIL notif=0 rounds=5 $0.0066
+cc-claim                 chopping-2pl seed=3 PASS notif=0 rounds=6 $0.0069
+cc-claim                 chopping-2pl seed=4 PASS notif=0 rounds=6 $0.0067
+cc-claim                 chopping-2pl seed=5 PASS notif=0 rounds=6 $0.0066
+cc-claim                 chopping-2pl seed=6 PASS notif=0 rounds=6 $0.0066
+cc-claim                 chopping-2pl seed=7 PASS notif=0 rounds=6 $0.0076
+cc-claim                 chopping-2pl seed=8 PASS notif=0 rounds=6 $0.0067
+cc-claim                 chopping-2pl seed=9 PASS notif=0 rounds=6 $0.0064
+cc-escalate              chopping-2pl seed=0 FAIL notif=1 rounds=6 $0.0071
+cc-escalate              chopping-2pl seed=1 FAIL notif=1 rounds=6 $0.0063
+cc-escalate              chopping-2pl seed=2 FAIL notif=1 rounds=6 $0.0069
+cc-escalate              chopping-2pl seed=3 FAIL notif=1 rounds=6 $0.0060
+cc-escalate              chopping-2pl seed=4 FAIL notif=1 rounds=6 $0.0067
+cc-escalate              chopping-2pl seed=5 FAIL notif=1 rounds=6 $0.0074
+cc-escalate              chopping-2pl seed=6 FAIL notif=1 rounds=6 $0.0064
+cc-escalate              chopping-2pl seed=7 FAIL notif=1 rounds=6 $0.0071
+cc-escalate              chopping-2pl seed=8 FAIL notif=1 rounds=6 $0.0071
+cc-escalate              chopping-2pl seed=9 FAIL notif=1 rounds=6 $0.0072
+
+====================================================================
+protocol    correct  trials  notif  acted on  rounds/trial   $/trial
+--------------------------------------------------------------------
+chopping-2pl      71%      94     10         0           7.8    0.0123
+
+total spend $1.159  -> results/haiku/llm_runs.jsonl
