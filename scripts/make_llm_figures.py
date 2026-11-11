@@ -83,9 +83,13 @@ def main() -> int:
     by = defaultdict(list)
     for r in runs:
         by[(r["cell"], r["protocol"])].append(r)
+    # Only the protocols this run actually recorded; gating on the whole
+    # PROTOCOL_ORDER drops every cell from a run made before a protocol
+    # existed, which is indistinguishable from having no usable cells.
+    present = [p for p in PROTOCOL_ORDER if any(k[1] == p for k in by)]
     have = [c for c in CELLS
             if all(len(by.get((c, p), [])) >= args.min_trials
-                   for p in PROTOCOL_ORDER)]
+                   for p in present)]
     # Serial has no concurrency, so a cell where serial itself registers an
     # anomaly has a predicate that cannot tell an A1-mangled result from a
     # real one. Those cells are shown in panel (b) but excluded from the
@@ -104,8 +108,8 @@ def main() -> int:
 
     # ---- (a) aggregate anomaly-free, Wilson intervals --------------------
     ax = axes[0]
-    xs = range(len(PROTOCOL_ORDER))
-    for x, p in zip(xs, PROTOCOL_ORDER):
+    xs = range(len(present))
+    for x, p in zip(xs, present):
         rs = [r for c in cells for r in by[(c, p)]]
         k, n = sum(1 for r in rs if free(r)), len(rs)
         _, lo, hi = wilson(k, n)
@@ -115,7 +119,7 @@ def main() -> int:
         ax.text(x, hi * 100 + 2.5, f"{k}/{n}", ha="center", va="bottom",
                 fontsize=8, color=INK)
     ax.set_xticks(list(xs))
-    ax.set_xticklabels(PROTOCOL_ORDER, rotation=28, ha="right", fontsize=8.5)
+    ax.set_xticklabels(present, rotation=28, ha="right", fontsize=8.5)
     for lbl in ax.get_xticklabels():
         if lbl.get_text() == "MTPO":
             lbl.set_fontweight("bold")
@@ -128,14 +132,14 @@ def main() -> int:
     ax = axes[1]
     shown = cells + excluded
     grid = [[100 * sum(1 for r in by[(c, p)] if free(r)) / len(by[(c, p)])
-             for p in PROTOCOL_ORDER] for c in shown]
+             for p in present] for c in shown]
     im = ax.imshow(grid, cmap=RAMP, vmin=0, vmax=100, aspect="auto")
     for i, row in enumerate(grid):
         for j, v in enumerate(row):
             ax.text(j, i, f"{v:.0f}", ha="center", va="center", fontsize=8,
                     color="white" if v > 55 else INK)
-    ax.set_xticks(range(len(PROTOCOL_ORDER)))
-    ax.set_xticklabels(PROTOCOL_ORDER, rotation=28, ha="right", fontsize=8.5)
+    ax.set_xticks(range(len(present)))
+    ax.set_xticklabels(present, rotation=28, ha="right", fontsize=8.5)
     ax.set_yticks(range(len(shown)))
     ax.set_yticklabels(
         [c + ('  (predicate unreliable)' if c in excluded else '')
@@ -144,7 +148,7 @@ def main() -> int:
     for i, c in enumerate(shown):
         if c in excluded:
             ax.axhline(i, color="white", lw=0)
-            for sp in range(len(PROTOCOL_ORDER)):
+            for sp in range(len(present)):
                 ax.add_patch(plt.Rectangle(
                     (sp - 0.5, i - 0.5), 1, 1, fill=False,
                     edgecolor="#b00", lw=1.4, zorder=5))
@@ -191,7 +195,7 @@ def main() -> int:
         ax.yaxis.grid(True, color=GRID, lw=0.8, zorder=0)
         ax.set_axisbelow(True)
 
-    n_tr = sum(len(by[(c, p)]) for c in cells for p in PROTOCOL_ORDER)
+    n_tr = sum(len(by[(c, p)]) for c in cells for p in present)
     fig.suptitle(
         f"Real LLM Workers — {model}, {len(cells)} cells, {n_tr} trials "
         f"(intervals are Wilson 95%)", fontsize=11)

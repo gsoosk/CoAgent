@@ -45,8 +45,13 @@ def load(path, refs):
     by = defaultdict(list)
     for r in runs:
         by[(r["cell"], r["protocol"])].append(r)
+    # Require only the protocols this run actually contains. Gating on the
+    # whole PROTOCOL_ORDER would drop every cell from a run recorded before a
+    # protocol was added, which looks identical to having no usable cells.
+    present = [p for p in PROTOCOL_ORDER
+               if any(k[1] == p for k in by)]
     have = [c for c in CELLS
-            if all(len(by[(c, p)]) >= 5 for p in PROTOCOL_ORDER)]
+            if all(len(by[(c, p)]) >= 5 for p in present)]
     clean = [c for c in have if all(free(r) for r in by[(c, "serial")])]
     return runs, by, have, clean, free
 

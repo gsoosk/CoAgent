@@ -61,8 +61,13 @@ def wilson(k, n, z=1.96):
 
 
 def panel(ax, vals, title, ylabel, fmt="{:.2f}", ylim=None, hline=None,
-          errs=None, labels=None):
-    xs = range(len(PROTOCOL_ORDER))
+          errs=None, labels=None, names=None):
+    # The axis follows the data, not the global protocol list: a run recorded
+    # before a protocol was added has fewer bars than PROTOCOL_ORDER has
+    # entries, and keying the axis off the global list made that a broadcast
+    # error instead of a shorter chart.
+    names = names or PROTOCOL_ORDER
+    xs = range(len(vals))
     ax.bar(xs, vals, width=0.58, color=BLUE, zorder=2)
     for i, (x, v) in enumerate(zip(xs, vals)):
         top = v
@@ -74,7 +79,7 @@ def panel(ax, vals, title, ylabel, fmt="{:.2f}", ylim=None, hline=None,
         ax.text(x, top, (labels[i] if labels else fmt.format(v)),
                 ha="center", va="bottom", fontsize=8, color=INK)
     ax.set_xticks(list(xs))
-    ax.set_xticklabels(PROTOCOL_ORDER, rotation=30, ha="right", fontsize=8)
+    ax.set_xticklabels(names, rotation=30, ha="right", fontsize=8)
     for lbl in ax.get_xticklabels():
         if lbl.get_text() == "MTPO":
             lbl.set_fontweight("bold")
@@ -251,12 +256,21 @@ def main() -> int:
     by = defaultdict(list)
     for r in runs:
         by[(r["cell"], r["protocol"])].append(r)
+    # Only the protocols this run actually recorded; gating on the whole
+    # PROTOCOL_ORDER drops every cell from a run made before a protocol
+    # existed, which is indistinguishable from having no usable cells.
+    present = [p for p in PROTOCOL_ORDER if any(k[1] == p for k in by)]
     have = [c for c in CELLS
-            if all(len(by[(c, p)]) >= 5 for p in PROTOCOL_ORDER)]
+            if all(len(by[(c, p)]) >= 5 for p in present)]
     cells = [c for c in have if all(free(r) for r in by[(c, "serial")])]
+    if not cells:
+        # A run still in flight has a protocol below the trial threshold on
+        # every cell, which left this dividing by zero instead of saying so.
+        print(f"no cell yet has >=5 trials for all of: {', '.join(present)}")
+        return 1
 
     corr, lohi, speed, cost = [], [], [], []
-    for p in PROTOCOL_ORDER:
+    for p in present:
         rs = [r for c in cells for r in by[(c, p)]]
         k, n = sum(1 for r in rs if free(r)), len(rs)
         _, lo, hi = wilson(k, n)
@@ -277,12 +291,12 @@ def main() -> int:
 
     fig, axes = plt.subplots(1, 4, figsize=(15, 3.8))
     panel(axes[0], corr, "(a) Correctness", "anomaly-free (%)",
-          ylim=(0, 118), errs=lohi,
+          ylim=(0, 118), errs=lohi, names=present,
           labels=[f"{v:.0f}" for v in corr])
     panel(axes[1], speed, "(b) Speed", "speedup vs serial",
-          ylim=(0, max(speed) * 1.3), hline=1.0)
+          ylim=(0, max(speed) * 1.3), hline=1.0, names=present)
     panel(axes[2], cost, "(c) Cost", "token cost vs serial",
-          ylim=(0, max(cost) * 1.3), hline=1.0)
+          ylim=(0, max(cost) * 1.3), hline=1.0, names=present)
 
     ax = axes[3]
     # Place each label above its point unless that would collide with one
@@ -290,7 +304,7 @@ def main() -> int:
     xr = (max(speed) - min(speed)) or 1.0
     yr = (max(cost) - min(cost)) or 1.0
     placed = []
-    for i, p in enumerate(PROTOCOL_ORDER):
+    for i, p in enumerate(present):
         subject = p == "MTPO"
         ax.scatter(speed[i], cost[i], s=150 if subject else 90, color=BLUE,
                    edgecolor="white", linewidth=2, zorder=3)
@@ -315,7 +329,7 @@ def main() -> int:
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
     ax.set_axisbelow(True)
 
-    n = sum(len(by[(c, p)]) for c in cells for p in PROTOCOL_ORDER)
+    n = sum(len(by[(c, p)]) for c in cells for p in present)
     fig.suptitle(
         f"Figure 5, from real LLM Workers — {model}, {len(cells)} cells, "
         f"{n} trials  (correctness bars are Wilson 95%)", fontsize=11)
@@ -329,7 +343,7 @@ def main() -> int:
     print(f"{'protocol':10}{'correct':>18}{'speedup':>16}{'cost':>16}")
     print(f"{'':10}{'LLM / paper':>18}{'LLM / paper':>16}{'LLM / paper':>16}")
     print("-" * 60)
-    for i, p in enumerate(PROTOCOL_ORDER):
+    for i, p in enumerate(present):
         ref = PAPER.get(p)
         if ref is None:          # certified chopping is not in that paper
             print(f"{p:10}{f'{corr[i]:.0f}% / --':>18}"
