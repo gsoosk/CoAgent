@@ -77,8 +77,11 @@ def load(path):
     by = defaultdict(list)
     for r in runs:
         by[(r["cell"], r["protocol"])].append(r)
+    # Only the protocols this run recorded: gating on all of PROTOCOL_ORDER
+    # drops every cell from a run made before a protocol existed.
+    present = [p for p in PROTOCOL_ORDER if any(k[1] == p for k in by)]
     have = [c for c in CELLS
-            if all(len(by[(c, p)]) >= 5 for p in PROTOCOL_ORDER)]
+            if all(len(by[(c, p)]) >= 5 for p in present)]
     clean = [c for c in have if all(free(r) for r in by[(c, "serial")])]
     return runs, by, have, clean, free
 
@@ -110,8 +113,11 @@ def bars(ax, vals, labels, title, ylabel, errs=None, fmt="{:.0f}",
 
 
 def figure_main(by, clean, free, model, outdir):
+    # Derived here rather than passed in: the same rule as in load(), so a
+    # run missing a protocol gets a shorter chart instead of a zero divide.
+    present = [p for p in PROTOCOL_ORDER if any(k[1] == p for k in by)]
     corr, errs, speed, cost = [], [], [], []
-    for p in PROTOCOL_ORDER:
+    for p in present:
         rs = [r for c in clean for r in by[(c, p)]]
         k, n = sum(1 for r in rs if free(r)), len(rs)
         _, lo, hi = wilson(k, n)
@@ -127,30 +133,35 @@ def figure_main(by, clean, free, model, outdir):
                               for x in by[(c, "serial")]) for c in clean))
 
     fig, axes = plt.subplots(1, 4, figsize=(15, 3.9))
-    bars(axes[0], corr, PROTOCOL_ORDER, "(a) Safety", "anomaly-free (%)",
+    bars(axes[0], corr, present, "(a) Safety", "anomaly-free (%)",
          errs=errs)
     axes[0].set_ylim(0, 118)
-    bars(axes[1], speed, PROTOCOL_ORDER, "(b) Speed", "speedup vs serial",
+    bars(axes[1], speed, present, "(b) Speed", "speedup vs serial",
          fmt="{:.2f}", hline=1.0)
-    bars(axes[2], cost, PROTOCOL_ORDER, "(c) Cost", "token cost vs serial",
+    bars(axes[2], cost, present, "(c) Cost", "token cost vs serial",
          fmt="{:.2f}", hline=1.0)
 
     ax = axes[3]
-    placed = []
     xr = (max(speed) - min(speed)) or 1.0
     yr = (max(corr) - min(corr)) or 1.0
-    for i, p in enumerate(PROTOCOL_ORDER):
+    for i, p in enumerate(present):
         subj = p == SUBJECT
         ax.scatter(speed[i], corr[i], s=170 if subj else 95,
                    color=ORANGE if subj else BLUE, edgecolor="white",
                    linewidth=2, zorder=3)
-        below = any(abs(speed[i] - px) / xr < 0.18
-                    and abs(corr[i] - py) / yr < 0.18 for px, py in placed)
+        # Look at every other point, not just the ones already drawn: the
+        # label goes above by default, so what matters is whether some point
+        # sits in that space -- and the one that does may come later in the
+        # loop. Checking only `placed` put MTPO's label on top of
+        # chopping-prio, whose point had not been plotted yet.
+        above = any(j != i
+                    and abs(speed[i] - speed[j]) / xr < 0.18
+                    and 0 <= (corr[j] - corr[i]) / yr < 0.22
+                    for j in range(len(present)))
         ax.annotate(p, (speed[i], corr[i]), textcoords="offset points",
-                    xytext=(0, -17 if below else 12), ha="center",
-                    fontsize=8, color=INK, va="top" if below else "baseline",
+                    xytext=(0, -17 if above else 12), ha="center",
+                    fontsize=8, color=INK, va="top" if above else "baseline",
                     fontweight="bold" if subj else "normal")
-        placed.append((speed[i], corr[i]))
     ax.set_xlabel("speedup vs serial", fontsize=9, color=MUTED)
     ax.set_ylabel("anomaly-free (%)", fontsize=9, color=MUTED)
     ax.set_title("(d) Safety vs speed", fontsize=10)
@@ -161,7 +172,7 @@ def figure_main(by, clean, free, model, outdir):
     tidy(ax)
     ax.grid(True, color=GRID, lw=0.8, zorder=0)
 
-    n = sum(len(by[(c, p)]) for c in clean for p in PROTOCOL_ORDER)
+    n = sum(len(by[(c, p)]) for c in clean for p in present)
     fig.suptitle(f"Certified chopping against every other protocol — "
                  f"{model}, {len(clean)} cells, {n} trials", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.91))
