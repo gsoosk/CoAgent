@@ -313,7 +313,53 @@ def guided_coarsen(plan: Plan, frontier: Frontier) -> Tuple[Plan, int]:
             return cur, merges
 
 
-def admit(proposed: Plan, frontier: Frontier) -> Admission:
+def _renumber(pieces: List[Piece]) -> List[Piece]:
+    return [Piece(p.workflow, i, p.footprint, p.label, p.span)
+            for i, p in enumerate(pieces)]
+
+
+def conflict_coarsen(plan: Plan, frontier: Frontier) -> Tuple[Plan, int]:
+    """Merge only the pieces that carry the conflict.
+
+    ``guided_coarsen`` merges the cheapest adjacent pair of an implicated
+    workflow, which can swallow a piece that has no conflict edge at all: a
+    leading private read ends up inside the locked piece although nothing
+    forced it there. Here each pass looks at one mixed block and, per
+    workflow, merges exactly the span from its first to its last piece with
+    a C edge in that block. Pieces outside the span keep their boundaries.
+
+    A span that reaches below the frontier cannot be merged; if no workflow
+    can make progress this falls back to ``guided_coarsen``, so the result
+    always certifies whenever sealing does.
+    """
+    cur = plan.copy()
+    merges = 0
+    while True:
+        blk = mixed_block(cur)
+        if blk is None:
+            return cur, merges
+        touched: Dict[str, Set[int]] = {}
+        for u, v, lab in blk:
+            if lab == "C":
+                touched.setdefault(u[0], set()).add(u[1])
+                touched.setdefault(v[0], set()).add(v[1])
+        progressed = False
+        for w in sorted(touched):
+            lo, hi = min(touched[w]), max(touched[w])
+            if hi == lo or lo < frontier.get(w, 0):
+                continue
+            ps = cur.pieces[w]
+            merged = ps[lo].merged_with(ps[lo + 1:hi + 1], lo)
+            cur.pieces[w] = _renumber(ps[:lo] + [merged] + ps[hi + 1:])
+            merges += hi - lo
+            progressed = True
+        if not progressed:
+            rest, more = guided_coarsen(cur, frontier)
+            return rest, merges + more
+
+
+def admit(proposed: Plan, frontier: Frontier,
+          coarsen=guided_coarsen) -> Admission:
     """Three-step admission (paper section 3.4).
 
     Certify the proposal; if it passes install it unchanged. Otherwise test
@@ -327,7 +373,7 @@ def admit(proposed: Plan, frontier: Frontier) -> Admission:
     sealed_ok, witness = certify(seal(proposed, frontier))
     if not sealed_ok:
         return Admission(Decision.REFUSED, None, witness)
-    repaired, merges = guided_coarsen(proposed, frontier)
+    repaired, merges = coarsen(proposed, frontier)
     return Admission(Decision.ADMITTED_COARSENED, repaired, merges=merges)
 
 

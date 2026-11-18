@@ -33,11 +33,20 @@ from coagent.agents.backends import (                  # noqa: E402
     DEFAULTS, load_key, price,
 )
 from coagent.agents.llm import LLMAgent, ToolSpec       # noqa: E402
+from coagent.agents.planning import (                  # noqa: E402
+    PlanningLLMAgent, negotiate_order,
+)
 from coagent.protocols import PROTOCOL_ORDER, PROTOCOLS  # noqa: E402
 from coagent.runner import reference_states            # noqa: E402
 from coagent.runtime import CallKind, Runtime          # noqa: E402
-from coagent.workloads import CELLS                    # noqa: E402
+from coagent.workloads import CELLS as _BENCH_CELLS     # noqa: E402
+from coagent.workloads.reorder_cells import REORDER_CELLS  # noqa: E402
 from coagent.workloads.base import invariant_ok, normalize  # noqa: E402
+
+
+# The reorder cells are addressable by name but are not part of "all", so
+# the benchmark matrix stays the twelve cells it was scored on.
+CELLS = {**_BENCH_CELLS, **REORDER_CELLS}
 
 
 class _JudgeStub:
@@ -113,6 +122,11 @@ def main() -> int:
     ap.add_argument("--max-rounds", type=int, default=14)
     ap.add_argument("--dry-run", action="store_true",
                     help="estimate cost and exit without calling the API")
+    ap.add_argument("--free-planning", action="store_true",
+                    help="do not charge the order-negotiation call to the "
+                         "clock: what a plan made ahead of time, or reused "
+                         "across runs, would cost. Recorded under the "
+                         "protocol name with a '-free' suffix")
     ap.add_argument("--force", action="store_true",
                     help="re-run trials already present in the output file")
     ap.add_argument("--out", default=str(ROOT / "results" / "llm_runs.jsonl"))
@@ -121,7 +135,7 @@ def main() -> int:
     model = args.model or DEFAULTS[args.provider]
     key_var = ("ANTHROPIC_API_KEY" if args.provider == "anthropic"
                else "OPENROUTER_API_KEY")
-    cells = list(CELLS) if args.cells == ["all"] else args.cells
+    cells = list(_BENCH_CELLS) if args.cells == ["all"] else args.cells
     protos = (list(PROTOCOL_ORDER) if args.protocols == ["all"]
               else args.protocols)
     unknown = [c for c in cells if c not in CELLS]
@@ -178,18 +192,27 @@ def main() -> int:
                 _JudgeStub(), _r.Random(0), p_task_failure=0.0)
             declared = [getattr(a, "declare_pieces", lambda: [])()
                         for a in _probe]
+            protocol = PROTOCOLS[proto]()
+            negotiates = getattr(protocol, "negotiates_order", False)
+            agent_cls = PlanningLLMAgent if negotiates else LLMAgent
             agents = [
-                LLMAgent(f"agent-{i}", task, tools,
+                agent_cls(f"agent-{i}", task, tools,
                          provider=args.provider, model=model,
                          max_rounds=args.max_rounds,
                          pieces=declared[i] if i < len(declared) else [],
                          effort=args.effort, thinking=not args.no_thinking)
                 for i, task in enumerate(cell.llm_spec["tasks"])
             ]
-            rt = Runtime(target, agents, PROTOCOLS[proto](), random.Random(seed))
+            rt = Runtime(target, agents, protocol, random.Random(seed))
             rt.jitter_sigma = 0.0
             rt.time_scale = 1.0
+            negotiation = None
             try:
+                if negotiates:
+                    negotiation = negotiate_order(agents)
+                    if args.free_planning:
+                        for ag in agents:
+                            ag.plan_latency = 0.0
                 rt.run()
             except Exception as exc:                      # noqa: BLE001
                 # Name the type: a dropped trial is invisible in the output
@@ -208,7 +231,10 @@ def main() -> int:
             ct = sum(a.completion_tokens for a in agents)
             wall, _ = rt.totals()
             rec = {
-                "cell": cell_name, "protocol": proto, "seed": seed,
+                "cell": cell_name,
+                "protocol": proto + ("-free" if negotiates
+                                     and args.free_planning else ""),
+                "seed": seed,
                 "provider": args.provider, "model": model, "invariant_ok": ok, "wall": wall,
                 "prompt_tokens": pt, "completion_tokens": ct,
                 "usd": price(model, pt, ct),
@@ -219,6 +245,17 @@ def main() -> int:
                 "transcript": [a.transcript for a in agents],
                 "events": [e for a in agents for e in a.events],
             }
+            if cell.anomaly_free is not None:
+                rec["anomaly_free"] = bool(
+                    cell.anomaly_free(rec["final_state"], refs))
+            if hasattr(protocol, "stats"):
+                rec["proto_stats"] = protocol.stats()
+            if getattr(protocol, "plan", None) is not None:
+                # the plan as it stood at the end: what was actually cut
+                rec["plan"] = {w: [p.label for p in ps]
+                               for w, ps in protocol.plan.pieces.items()}
+            if negotiation is not None:
+                rec["negotiation"] = negotiation
             results.append(rec)
             fh.write(json.dumps(rec, default=str) + "\n")
             fh.flush()

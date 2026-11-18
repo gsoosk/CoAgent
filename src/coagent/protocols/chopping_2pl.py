@@ -87,6 +87,10 @@ class ChoppingTwoPhase(CertifiedChopping):
                 self.locks.append(Held(a, owner))
                 self.incremental_acquires += 1
 
+    def _needed(self, piece, call: Call) -> Sequence[Access]:
+        """The locks this call takes. Subclasses may strengthen them."""
+        return accesses_for(call)
+
     # -- dispatch ----------------------------------------------------------
     def dispatch(self, rt: Runtime, st: AgentState, call: Call) -> Outcome:
         self._ensure_plan(rt)
@@ -110,7 +114,7 @@ class ChoppingTwoPhase(CertifiedChopping):
                 break
 
         # Growing phase: take only what this call touches, when it touches it.
-        need = accesses_for(call)
+        need = self._needed(piece, call)
         blocker = self._blocker_for(need, st.name)
         if blocker is not None:
             key = (call.prefix if call.prefix is not None

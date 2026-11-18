@@ -52,6 +52,9 @@ class CertifiedChopping(Protocol):
 
     name = "chopping"
 
+    # how a plan that fails certification is merged; subclasses may tighten it
+    _coarsen = staticmethod(guided_coarsen)
+
     def __init__(self):
         self.plan: Optional[Plan] = None
         self.frontier: Dict[str, int] = {}
@@ -85,7 +88,7 @@ class CertifiedChopping(Protocol):
             # workflow is one piece. This is the paper's "correctly collapses
             # to whole-workflow locking where the structure does not permit
             # chopping" -- it buys nothing, and that is the point.
-            plan, self.initial_merges = guided_coarsen(plan, self.frontier)
+            plan, self.initial_merges = self._coarsen(plan, self.frontier)
             rt.trace(f"certification merged {self.initial_merges} piece(s)")
         self.plan = plan
         self.certified = True
@@ -101,7 +104,16 @@ class CertifiedChopping(Protocol):
         """
         ps = self.plan.pieces[st.name]
         if call.piece is not None:
-            return ps[min(call.piece, len(ps) - 1)]
+            # call.piece is the index of the step in the *declared* plan. A
+            # merged piece stands for ``span`` declared steps, so walk the
+            # spans; indexing the certified plan directly is only right
+            # when nothing or everything was merged.
+            covered = 0
+            for p in ps:
+                covered += p.span
+                if call.piece < covered:
+                    return p
+            return ps[-1]
         held = self.active.get(st.name)
         start = held if held is not None else self.frontier.get(st.name, 0)
         accs = accesses_for(call)
@@ -187,8 +199,11 @@ class CertifiedChopping(Protocol):
         proposed = self.plan.copy()
         extra = frozenset(set(piece.footprint) | set(accesses_for(call)))
         ps = proposed.pieces[st.name]
-        ps[piece.index] = Piece(st.name, piece.index, extra, piece.label)
-        res = admit(proposed, self.frontier)
+        # keep the span: a merged piece that is widened is still merged, and
+        # must go on being held across the reasoning gap it was merged over
+        ps[piece.index] = Piece(st.name, piece.index, extra, piece.label,
+                                piece.span)
+        res = admit(proposed, self.frontier, coarsen=self._coarsen)
 
         if res.decision is Decision.REFUSED:
             self.refused += 1
