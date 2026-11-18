@@ -32,7 +32,7 @@ from matplotlib.patches import Patch                # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from coagent.protocols import PROTOCOL_ORDER        # noqa: E402
+from coagent.protocols import FIGURE_ORDER as PROTOCOL_ORDER        # noqa: E402
 from coagent.runner import reference_states         # noqa: E402
 from coagent.workloads import CELLS                 # noqa: E402
 

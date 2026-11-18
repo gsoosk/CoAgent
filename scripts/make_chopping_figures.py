@@ -33,17 +33,19 @@ from matplotlib.patches import Patch            # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from coagent.protocols import PROTOCOL_ORDER    # noqa: E402
+from coagent.protocols import FIGURE_ORDER as PROTOCOL_ORDER    # noqa: E402
 from coagent.runner import (                    # noqa: E402
     TrialConfig, reference_states, run_trial,
 )
 from coagent.workloads import CELLS             # noqa: E402
+from figlabels import place_labels              # noqa: E402
 
 # Per-cell aggregates use the MEDIAN, not the mean: one 2PL trial in
 # 722 ended with an agent still blocked and its virtual clock ran away
 # to 15029s against a 16s cell median. A single such trial moves a
 # mean by two orders of magnitude; it moves a median not at all.
 BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
+VIOLET = "#4a3aa7"
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d9d8d3"
 SUBJECT = "chopping"
 
@@ -149,19 +151,6 @@ def figure_main(by, clean, free, model, outdir):
         ax.scatter(speed[i], corr[i], s=170 if subj else 95,
                    color=ORANGE if subj else BLUE, edgecolor="white",
                    linewidth=2, zorder=3)
-        # Look at every other point, not just the ones already drawn: the
-        # label goes above by default, so what matters is whether some point
-        # sits in that space -- and the one that does may come later in the
-        # loop. Checking only `placed` put MTPO's label on top of
-        # chopping-prio, whose point had not been plotted yet.
-        above = any(j != i
-                    and abs(speed[i] - speed[j]) / xr < 0.18
-                    and 0 <= (corr[j] - corr[i]) / yr < 0.22
-                    for j in range(len(present)))
-        ax.annotate(p, (speed[i], corr[i]), textcoords="offset points",
-                    xytext=(0, -17 if above else 12), ha="center",
-                    fontsize=8, color=INK, va="top" if above else "baseline",
-                    fontweight="bold" if subj else "normal")
     ax.set_xlabel("speedup vs serial", fontsize=9, color=MUTED)
     ax.set_ylabel("anomaly-free (%)", fontsize=9, color=MUTED)
     ax.set_title("(d) Safety vs speed", fontsize=10)
@@ -176,6 +165,7 @@ def figure_main(by, clean, free, model, outdir):
     fig.suptitle(f"Certified chopping against every other protocol — "
                  f"{model}, {len(clean)} cells, {n} trials", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.91))
+    place_labels(axes[3], speed, corr, present, bold=(SUBJECT,))
     fig.savefig(outdir / "fig_chopping.png", dpi=170, facecolor="white")
     print(f"wrote {outdir / 'fig_chopping.png'}")
 
@@ -222,7 +212,7 @@ def figure_where(by, have, outdir):
 def figure_where_prio(by, have, model, outdir):
     """Per-cell speedup over whole-workflow 2PL, for each chopping variant.
 
-    All three series share the 2PL baseline, so the chart reads as one
+    All series share the 2PL baseline, so the chart reads as one
     comparison. chopping-2pl sitting on the 1.0 line is the point of the
     figure as much as chopping-prio clearing it: on a contended cell
     certification coarsens the workflow into a single maximal piece, and
@@ -230,6 +220,8 @@ def figure_where_prio(by, have, model, outdir):
     """
     series = [("chopping", "certified chopping", BLUE),
               ("chopping-2pl", "chopping-2pl (incremental locks)", AQUA),
+              ("chopping-2pl-intent",
+               "chopping-2pl-intent (write lock at first touch)", VIOLET),
               ("chopping-prio", "chopping-prio (sigma-ordered)", ORANGE)]
     series = [s for s in series if any(k[1] == s[0] for k in by)]
     if len(series) < 2:

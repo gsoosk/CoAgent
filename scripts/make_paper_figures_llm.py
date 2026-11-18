@@ -33,9 +33,10 @@ import matplotlib.pyplot as plt                 # noqa: E402
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "src"))
 
-from coagent.protocols import PROTOCOL_ORDER    # noqa: E402
+from coagent.protocols import FIGURE_ORDER as PROTOCOL_ORDER    # noqa: E402
 from coagent.runner import reference_states     # noqa: E402
 from coagent.workloads import CELLS             # noqa: E402
+from figlabels import place_labels              # noqa: E402
 
 import re
 
@@ -308,18 +309,11 @@ def main() -> int:
         subject = p == "MTPO"
         ax.scatter(speed[i], cost[i], s=150 if subject else 90, color=BLUE,
                    edgecolor="white", linewidth=2, zorder=3)
-        below = any(abs(speed[i] - px) / xr < 0.18
-                    and abs(cost[i] - py) / yr < 0.18 for px, py in placed)
-        ax.annotate(p, (speed[i], cost[i]), textcoords="offset points",
-                    xytext=(0, -17 if below else 12), ha="center",
-                    fontsize=8, color=INK,
-                    va="top" if below else "baseline",
-                    fontweight="bold" if subject else "normal")
-        placed.append((speed[i], cost[i]))
     ax.set_xlabel("speedup vs serial", fontsize=9, color=MUTED)
     ax.set_ylabel("token cost vs serial", fontsize=9, color=MUTED)
     ax.set_title("(d) Cost vs speed", fontsize=10)
-    ax.annotate("cheaper and faster ↘", xy=(0.97, 0.04),
+    # top right: the bottom-right corner is where the best points are
+    ax.annotate("cheaper and faster ↘", xy=(0.97, 0.93),
                 xycoords="axes fraction", ha="right", fontsize=8,
                 style="italic", color=MUTED)
     ax.margins(0.2)
@@ -334,6 +328,7 @@ def main() -> int:
         f"Figure 5, from real LLM Workers — {model}, {len(cells)} cells, "
         f"{n} trials  (correctness bars are Wilson 95%)", fontsize=11)
     fig.tight_layout(rect=(0, 0, 1, 0.91))
+    place_labels(ax, speed, cost, present, bold=("MTPO",))
     out = Path(args.outdir) / "fig5_llm.png"
     fig.savefig(out, dpi=170, facecolor="white")
     print(f"wrote {out}")
