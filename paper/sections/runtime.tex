@@ -1,0 +1,212 @@
+\section{Runtime}
+\label{sec:runtime}
+
+The certificate of \S\ref{sec:theory} is conditional on the execution rules
+E1--E4. The job of the runtime is to make those hypotheses true. It sits
+between the agents and the target system as a middleware: every tool call an
+agent emits is dispatched through it, and nothing reaches the target system
+any other way. Figure~\ref{fig:arch} shows the path of a call.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  box/.style={draw=ccmuted, rounded corners=2pt, font=\scriptsize,
+              minimum height=6mm, inner sep=3pt, align=center},
+  arr/.style={-{Stealth[length=1.6mm]}, ccmuted, line width=0.6pt},
+  lab/.style={font=\scriptsize, ccmuted}]
+\node[box] (agent) at (0,0) {agent\\(model loop)};
+\node[box, right=7mm of agent] (piece) {map call\\to piece};
+\node[box, right=5mm of piece] (enf) {footprint\\check (E3)};
+\node[box, right=5mm of enf] (lock) {piece\\locks (E1)};
+\node[box, right=5mm of lock] (store) {target\\system};
+\node[box, below=7mm of enf] (adm) {admission\\(Alg.~\ref{alg:admit})};
+\draw[arr] (agent) -- node[above, lab] {call} (piece);
+\draw[arr] (piece) -- (enf);
+\draw[arr] (enf) -- (lock);
+\draw[arr] (lock) -- (store);
+\draw[arr] (enf) -- node[right, lab] {outside} (adm);
+\draw[arr] (adm.west) -| node[pos=0.25, below, lab] {refuse / admit} (agent.south);
+\end{tikzpicture}
+\caption{The path of one tool call. A call inside the footprint of the
+executing piece proceeds to locking. A call outside it is a plan revision: it
+is admitted, possibly after coarsening, or refused and reported back to the
+agent as a tool result.}
+\label{fig:arch}
+\end{figure}
+
+\subsection{Mediation and fail-closed enforcement}
+
+Every read, range scan and write is checked against the footprint of the
+piece that is currently executing for that workflow. An access inside the
+footprint proceeds. An access outside it never reaches the target system.
+Instead it is treated as what it is, a proposal to revise the plan, and is
+handed to Algorithm~\ref{alg:admit}. If the revision is admitted the plan is
+updated and the call proceeds; if it is refused the call fails, and the agent
+receives the refusal as the result of its tool call.
+
+Enforcement does not depend on the agent's cooperation. This matters because
+a model-driven agent does not follow a script: it can call any tool with any
+argument at any time, and its own account of what it intends to do is not
+evidence. The trust boundary is explicit. The tools and the middleware are
+trusted; the agent that drives them is not.
+
+\paragraph{Pieces for a model-driven agent.}
+A scripted workflow declares its steps and their grouping directly. A
+model-driven agent declares only a footprint per piece, and the runtime must
+decide which piece a call belongs to. It advances from the piece currently
+held to the first later piece whose footprint permits the access; if none
+does, the access stays with the current piece and becomes a revision proposal.
+Every gap between two tool calls of a model-driven agent is a reasoning gap,
+so a piece that certification left unmerged closes when its call returns. A
+piece that certification merged across a reasoning gap is held through it;
+releasing it per call would undo exactly the repair that made the plan safe.
+
+\subsection{Piece isolation: three locking disciplines}
+\label{sec:runtime:locking}
+
+Rule E1 requires each piece to be serializable with respect to every other
+piece. We enforce it by locking, with read and write modes and with range
+locks so that an insert into a scanned range is blocked. Locks never outlive a
+piece: they are released when the piece commits, which is what lets a chopped
+workflow give up its shared footprint before the model starts reasoning.
+
+Within that frame there is a design choice---when a piece acquires its
+locks---and we study three answers (Table~\ref{tab:locking}).
+
+\begin{table}[t]
+\caption{Three ways to isolate a piece. All release at the piece boundary and
+all run under the same certificate.}
+\label{tab:locking}
+\small
+\begin{tabular}{@{}l>{\raggedright}p{2.05cm}>{\raggedright}p{1.85cm}>{\raggedright\arraybackslash}p{1.9cm}@{}}
+\toprule
+ & acquires & on conflict & aborts when \\
+\midrule
+\cc     & whole footprint, one wait & wait & never \\
+\cctwo  & per access, at first use  & wait & a wait-for cycle is detected \\
+\ccs    & per access, at first use  & higher $\sigma$ waits; lower $\sigma$ wounds & a lower-$\sigma$ piece needs the lock \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{\cc: atomic footprint.}
+A piece acquires locks for its entire declared footprint atomically, in one
+wait, before executing. Because nothing is acquired while holding a lock, no
+wait-for cycle can form and the lock manager is deadlock-free by
+construction. The cost is over-reservation in time: an object the piece will
+not touch until its last step is locked from its first step.
+
+\paragraph{\cctwo: two-phase locking inside a piece.}
+A piece takes each lock when the access happens and releases all of them
+together at the piece boundary: strict two-phase locking scoped to a piece.
+Holds are shorter, but hold-and-wait returns, and with it deadlock. The
+typical case is a lock upgrade. Two pieces each hold a read lock on an object
+and each then requests the write lock. \cctwo detects the cycle in the
+wait-for graph, aborts the member with the highest $\sigma$, undoes its writes
+through the registered inverses, and restarts it.
+
+\paragraph{\ccs: priority-ordered locking.}
+The deadlock in \cctwo is the only thing standing between incremental locking
+and a strict improvement, and it does not have to be detected. It can be made
+unreachable. The device is the one \mtpo uses for notifications: a rank
+$\sigma$ assigned to every workflow at launch, and a rule that influence flows
+in one direction along it. Applied to lock waits, the rule is:
+\begin{itemize}
+\item if the requester's $\sigma$ is \emph{higher} than the holder's, the
+  requester \emph{waits};
+\item if the requester's $\sigma$ is \emph{lower} than the holder's, the
+  holder is \emph{wounded}: it is aborted, its writes are undone, its locks
+  are released, and the requester proceeds.
+\end{itemize}
+This is the wound-wait scheme of Rosenkrantz et al.~\cite{rosenkrantz1978}
+with $\sigma$ as the timestamp. We chose it over wait-die because wait-die
+aborts a requester the moment it meets any held lock, including one about to
+be released.
+
+The semantics line up with \mtpo as well. Under \mtpo the lower-ranked agent
+writes as though it ran first and the higher-ranked agent absorbs the change
+through a notification. Under \ccs the lower-ranked agent takes the lock as
+though it ran first and the higher-ranked agent absorbs the change by aborting
+and redoing. The order is the same and the direction of yielding is the same;
+what differs is the mechanism of the yield---premise repair there, redo here.
+\S\ref{sec:eval:agent} shows that this difference matters for agents.
+
+\begin{proposition}[The certificate survives incremental locking]
+\label{prop:atomic}
+Under \cctwo and \ccs, every execution satisfies E1.
+\end{proposition}
+
+\begin{proof}
+Both disciplines acquire a lock before each access and release no lock before
+the piece commits or aborts, and an aborted piece's writes are undone before
+its locks are released. This is strict two-phase locking with pieces as the
+transactions, so the execution is conflict-serializable at piece granularity
+and no piece observes an uncommitted write of another.
+\end{proof}
+
+One-shot acquisition was therefore never buying correctness. It was buying
+deadlock freedom, and \ccs buys that differently:
+
+\begin{proposition}[\ccs is deadlock-free]
+\label{prop:acyclic}
+Under \ccs the wait-for graph is acyclic at all times.
+\end{proposition}
+
+\begin{proof}
+A workflow waits only for a workflow of strictly lower $\sigma$. A cycle in
+the wait-for graph would require $\sigma$ to decrease strictly around the
+cycle, which is impossible.
+\end{proof}
+
+The workflow with the lowest $\sigma$ never waits and is never wounded, so
+some workflow always makes progress. A higher-ranked workflow can be wounded
+repeatedly; the runtime caps restarts and reports a workflow that exhausts the
+cap as failed. We measure how often wounds occur and whether the cap is ever
+reached in \S\ref{sec:eval:locking}.
+
+\subsection{Refusals, aborts and the agent}
+
+Two runtime events are visible to the agent, and they ask different things of
+it.
+
+A \emph{refusal} is returned as the result of the offending tool call. The
+agent's conversation is intact, and it is expected to continue: by retrying
+once the blocking piece has released, by choosing an operation inside its
+footprint, or by reporting that the intent cannot be met.
+
+An \emph{abort}---a deadlock victim under \cctwo or a wound under
+\ccs---restarts the agent. Its writes are undone, its locks are released, and
+its conversation is reset to the original task statement. The agent does not
+see a partial failure and is not asked to reason about one; it performs its
+task again against the current state.
+
+\subsection{Durable continuation}
+
+Chopping trades failure atomicity for concurrency: once a piece commits, its
+effects are visible even if the process dies before the next piece. The
+certificate says nothing about this, and the runtime must. Each piece's writes
+and the workflow's progress record, including its local variables, are
+committed in one transaction of the underlying store. A crash inside that
+transaction rolls back both, so pieces are atomic; a crash after it leaves a
+durable marker from which recovery replays the remaining pieces forward (rule
+E4).
+
+\subsection{Implementations}
+\label{sec:runtime:impl}
+
+We built the mechanism twice. The \emph{durable runtime} is about 1{,}470
+lines of Python over SQLite in write-ahead-logging mode. It runs workflows on
+real threads, implements \cc with durable continuation, and is used for the
+mechanism-level throughput, crash and certification-cost experiments.
+
+The \emph{agent runtime} is a middleware in the style of
+CoAgent~\cite{lyu2026coagent}: tools declare footprints and register
+inverses, and a concurrency-control protocol is consulted on every call. In
+it we implemented \cc, \cctwo and \ccs next to five other protocols---serial
+execution, no coordination, whole-workflow 2PL and OCC with saga undo, and
+\mtpo---so that all eight face the same agents, tools and workloads. Its
+store is in memory, so it has no crash boundary and does not implement durable
+continuation. An abort in this runtime restarts the whole workflow and
+compensates the writes of pieces it had already committed, rather than
+restarting only the aborted piece from a progress record; \S\ref{sec:discussion}
+discusses the consequence.

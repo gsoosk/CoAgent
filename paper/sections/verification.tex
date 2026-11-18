@@ -1,0 +1,78 @@
+\section{Verification}
+\label{sec:verification}
+
+Every soundness claim in \S\ref{sec:theory} is checked by brute force rather
+than argued only on paper. The ground truth is an oracle that enumerates every
+interleaving of the pieces of a plan that respects program order, builds the
+conflict graph at workflow granularity for each, and tests it for cycles. A
+plan is \emph{truly safe} if and only if no interleaving has a cyclic graph.
+The certifier is sound if it never certifies a plan the oracle finds unsafe.
+
+\begin{table}[t]
+\caption{Bounded exhaustive verification of the durable runtime. Ground truth
+enumerates executions and tests conflict-serializability at workflow
+granularity.}
+\label{tab:verify}
+\small
+\begin{tabular}{@{}p{3.55cm}rp{1.85cm}r@{}}
+\toprule
+Property checked & Scale & Ground truth & Viol. \\
+\midrule
+Static certification, 2 workflows & 256 plans & all interleavings & 0 \\
+Static certification, 3 workflows & 4{,}096 plans & all interleavings & 0 \\
+Repair yields a serial-equivalent plan & 3{,}820 repairs & all interleavings & 0 \\
+Cycles persist under refinement (Lemma~\ref{lem:persist}) & 1{,}023 refin. & 258 sealed cycles & 0 \\
+Admission soundness (Theorem~\ref{thm:inherit}) & 3{,}000 revisions & all interleavings & 0 \\
+Committed prefix never rewritten & 3{,}000 revisions & structural equality & 0 \\
+Sealing characterization (Theorem~\ref{thm:char}) & 9{,}290 choppings & exhaustive future-only search & 0 \\
+Range footprints catch phantoms & 2{,}000 scenarios & all interleavings & 0 \\
+Concurrent runtime, safe policies & 72 batches & trace oracle + invariants & 0 \\
+Unchecked control must fail & 18 batches & trace oracle + invariants & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Table~\ref{tab:verify} summarizes the checks. Static certification is
+exhaustive over all assignments of read and write to two shared items across
+two and three workflows: every plan is either certified and checked against
+all interleavings, or rejected, repaired, and then checked against all
+interleavings of the repaired plan. Prefix-aware admission is checked on
+3{,}000 randomly generated revision scenarios with randomly placed frontiers.
+For each we confirm that an admitted plan is serial-equivalent under every
+interleaving and that the committed prefix was never rewritten. By enumerating
+all 9{,}290 future-only choppings across those scenarios we confirm that
+refusal coincides exactly with the non-existence of a certified future-only
+coarsening, which is Theorem~\ref{thm:char}. The refinement row is
+non-vacuous by construction: it counts only scenarios whose sealing fails to
+certify.
+
+Two constructed witnesses are machine-checked as well: the impossibility
+instance of Figure~\ref{fig:witness}, where the single available future-only
+chopping fails to certify and the plan admits a non-serializable execution,
+and the concurrent-admission counterexample of Theorem~\ref{thm:serial}.
+
+The verifier also drives the concurrent runtime, not only the graph logic. It
+runs batches of 16 workflows at eight threads with mid-flight revisions in
+progress and requires every recorded history to be serializable and every
+application invariant to hold. It separately requires that the
+\emph{unchecked} control---the same fine chopping executed with no
+certification---does fail, so that a passing run cannot be an artefact of
+undemanding workloads.
+
+\paragraph{Independent re-implementation.}
+The agent runtime of \S\ref{sec:runtime:impl} re-implements certification,
+sealing, admission and guided coarsening from the definitions, without sharing
+code with the durable runtime, and is checked against its own brute-force
+oracle: exhaustive static plans for two workflows over two items and three
+workflows over one, 300 repaired plans, 400 refinement scenarios, 250 characterization scenarios compared with
+exhaustive future-only search, 300 admitted revisions, both witnesses, a
+phantom scenario and a fail-closed enforcement test. All pass. Two independent
+implementations agreeing with two independent oracles does not prove the
+theorems, but it makes a shared implementation error an unlikely explanation
+for the results.
+
+\paragraph{Scope.}
+These results are bounds, not proofs of unbounded correctness. They cover
+small batches, a two-item alphabet for the static sweep, and syntactic
+read/write conflicts. They do not establish that real tool footprints are
+sound, which is an assumption the runtime enforces but cannot originate.

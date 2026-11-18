@@ -1,0 +1,102 @@
+\documentclass[sigconf,nonacm,anonymous]{acmart}
+
+\usepackage{booktabs}
+\usepackage{multirow}
+\usepackage{array}
+\usepackage{xspace}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{tikz}
+\usetikzlibrary{positioning,arrows.meta,calc,fit,patterns,decorations.pathreplacing}
+
+\settopmatter{printfolios=true}
+
+% ---- names used consistently throughout -----------------------------------
+\newcommand{\cc}{\textsc{CC}\xspace}
+\newcommand{\cctwo}{\textsc{CC-2PL}\xspace}
+\newcommand{\ccs}{\textsc{CC-$\sigma$}\xspace}
+\newcommand{\mtpo}{\textsc{MTPO}\xspace}
+\newcommand{\seal}{\mathsf{seal}}
+\newcommand{\cell}[1]{\texttt{#1}}
+\newcommand{\eg}{e.g.,\xspace}
+\newcommand{\ie}{i.e.,\xspace}
+
+\newtheorem{theorem}{Theorem}
+\newtheorem{lemma}{Lemma}
+\newtheorem{corollary}{Corollary}
+\newtheorem{proposition}{Proposition}
+\newtheorem{definition}{Definition}
+
+% colours shared by the TikZ figures and the plots
+\definecolor{ccblue}{HTML}{2A78D6}
+\definecolor{ccorange}{HTML}{EB6834}
+\definecolor{ccaqua}{HTML}{1BAF7A}
+\definecolor{ccmuted}{HTML}{52514E}
+\definecolor{ccgrid}{HTML}{D9D8D3}
+
+\begin{document}
+
+\title{Certified Chopping for Agent Tool Workflows: Admitting Plan Revisions over Committed Effects}
+
+\author{Anonymous Author(s)}
+\affiliation{\institution{Anonymous Institution}\country{}}
+
+\begin{abstract}
+Concurrent AI agents read and write shared application state through tools,
+and they interleave badly. Wrapping each tool call in a transaction does not
+make an agent's intent atomic; holding a transaction across an entire
+reason-and-act workflow serializes long intervals of private reasoning; and
+repairing conflicts after the fact makes correctness depend on the judgement
+of the model. Transaction chopping is the classical answer to this tension,
+but it assumes that transaction programs are fixed before execution. Agents
+are not fixed: they revise their plans after observing tool results, by which
+time earlier pieces have committed and their effects are visible.
+
+We study the resulting problem, \emph{prefix-aware recertification}: deciding
+whether a mid-flight plan revision can be admitted when the past can no longer
+be rechopped. We give a complete characterization. A revision is admissible
+under future-only repair if and only if \emph{sealing} every workflow's
+uncommitted remainder into one piece yields a plan with no mixed
+sibling--conflict cycle. The corollary is an impossibility result: when the
+residual cycle passes through a committed piece, no regrouping of the future
+helps, and neither does waiting for other workflows to finish. We further show
+that admission decisions must be serialized.
+
+We build a runtime that makes the certificate's hypotheses true rather than
+assumed---mediated, fail-closed footprint enforcement, range footprints for
+predicate reads, and piece-level locking---and we study three locking
+disciplines inside a piece, the last of which reuses a launch-time priority
+order to make deadlock unreachable. Bounded exhaustive checking against a
+brute-force serializability oracle finds no unsound admission. With real
+language-model agents on twelve workloads and two models, certified chopping
+with priority-ordered locking is anomaly-free in 98\% of trials, is
+statistically as fast as a state-of-the-art repair-based protocol
+($1.33\times$ versus $1.38\times$ over serial execution on contended
+workloads), is significantly faster than whole-workflow locking, and never
+deadlocks. When it fails, it leaves shared state clean rather than corrupted.
+We also report where the approach does not pay: most mid-flight escalations into
+shared state are inadmissible, and on workloads whose read-modify-write
+straddles the reasoning gap certification correctly collapses to
+whole-workflow locking.
+\end{abstract}
+
+\keywords{transaction chopping, concurrency control, LLM agents, tool use,
+serializability}
+
+\maketitle
+
+\input{sections/intro}
+\input{sections/background}
+\input{sections/model}
+\input{sections/theory}
+\input{sections/runtime}
+\input{sections/verification}
+\input{sections/eval}
+\input{sections/discussion}
+\input{sections/related}
+\input{sections/conclusion}
+
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{refs}
+
+\end{document}

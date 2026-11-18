@@ -1,0 +1,217 @@
+\section{Prefix-Aware Recertification}
+\label{sec:theory}
+
+Let a plan $P$ be certified and executing. The \emph{frontier} $\phi$
+records, for each workflow $w$, the number $\phi(w)$ of its pieces that have
+committed. A workflow $r$ proposes to replace its uncommitted suffix with a
+new sequence of pieces, giving a revised plan $P'$. The runtime must decide
+whether to admit $P'$ and, if the proposed chopping is too fine, whether it
+can be repaired.
+
+\subsection{Soundness of recertification}
+
+\begin{theorem}[Inherited isolation]
+\label{thm:inherit}
+If $P'$ is SC-cycle-free, its committed prefix is identical to the prefix
+actually executed, and the runtime satisfies E1--E4, then the resulting
+history is conflict-serializable at workflow granularity.
+\end{theorem}
+
+\begin{proof}
+The pieces that already ran are, by construction, exactly the prefix pieces of
+$P'$ with the footprints they declared, and E3 guarantees that their actual
+accesses were inside those footprints. The observed execution is therefore a
+legal execution of the chopping $P'$ under the execution rules. The classical
+chopping theorem~\cite{shasha1995chopping} applies to $P'$ and yields
+equivalence to a serial execution of the workflows of $P'$.
+\end{proof}
+
+Theorem~\ref{thm:inherit} is an application of established theory to a revised
+plan, not a new isolation theorem. Its force is in the hypothesis:
+recertification must cover the \emph{whole} batch, including pieces that have
+committed. Certifying only the new suffix discards exactly the conflicts that
+close a cycle through the past.
+
+\subsection{What repairs remain after commitment}
+
+Before execution, a rejected chopping is repaired by merging pieces. After
+commitment only the uncommitted suffix may be regrouped.
+
+\begin{definition}
+$P''$ is a \emph{future-only coarsening} of $P'$ at $\phi$ if the first
+$\phi(w)$ pieces of every workflow $w$ are unchanged and the remaining pieces
+of $w$ are grouped into contiguous runs. The \emph{sealing}
+$\seal(P',\phi)$ is the future-only coarsening that merges each workflow's
+entire remainder into a single piece.
+\end{definition}
+
+\begin{lemma}[Sealing is coarsest]
+\label{lem:coarsest}
+Every future-only coarsening of $P'$ at $\phi$ is a refinement of
+$\seal(P',\phi)$.
+\end{lemma}
+
+\begin{proof}
+Both agree on the committed prefix. Sealing places each workflow's whole
+remainder in one piece; any other future-only coarsening partitions that same
+remainder into contiguous runs, which is a refinement of the single piece.
+\end{proof}
+
+\begin{lemma}[Cycles persist under refinement]
+\label{lem:persist}
+If a chopping contains a mixed simple cycle, so does every refinement of it.
+\end{lemma}
+
+This is the classical non-removability property of
+chopping~\cite{shasha1995chopping}: splitting a piece adds S~edges among the
+parts and distributes the piece's C~edges among them, so a mixed cycle through
+the original piece survives as a mixed cycle through its parts.
+
+\begin{theorem}[Admissibility characterization]
+\label{thm:char}
+A revision is admissible under future-only coarsening if and only if
+$\seal(P',\phi)$ is SC-cycle-free.
+\end{theorem}
+
+\begin{proof}
+($\Leftarrow$) If the sealing is SC-cycle-free, it is itself a certified
+future-only coarsening, so the revision is admissible.
+($\Rightarrow$) Suppose the sealing contains a mixed simple cycle. By
+Lemma~\ref{lem:coarsest} every future-only coarsening is a refinement of the
+sealing, and by Lemma~\ref{lem:persist} every such refinement contains a mixed
+simple cycle. Hence no future-only coarsening certifies.
+\end{proof}
+
+Theorem~\ref{thm:char} turns admissibility into one test on the coarsest
+candidate. It also tells the runtime that when that test fails, searching the
+exponentially many intermediate choppings is pointless.
+
+\begin{corollary}[Impossibility of future-only repair]
+\label{cor:imp}
+If $\seal(P',\phi)$ contains a mixed simple cycle, then no future-only repair
+exists, and the runtime must refuse the revision or compensate the committed
+prefix. Every such cycle passes through a committed piece.
+\end{corollary}
+
+\begin{proof}
+The first claim is the contrapositive of Theorem~\ref{thm:char}. For the
+second, in the sealed plan each workflow's uncommitted remainder is a single
+piece, so every S~edge has at least one committed endpoint; a mixed cycle
+contains an S~edge.
+\end{proof}
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  piece/.style={draw=ccmuted, rounded corners=2pt, minimum height=5mm,
+                minimum width=13mm, font=\scriptsize, inner sep=1.5pt},
+  done/.style={piece, fill=ccgrid},
+  prop/.style={piece, densely dotted, line width=0.8pt},
+  S/.style={ccblue, line width=0.9pt},
+  C/.style={ccorange, line width=0.9pt, dashed},
+  lab/.style={font=\scriptsize}]
+% timeline
+\node[lab, anchor=east] at (-0.2,1.2) {$W_0$};
+\node[lab, anchor=east] at (-0.2,0.0) {$W_1$};
+\node[done] (p0) at (0.7,1.2) {$r(x)$};
+\node[done] (q)  at (2.6,0.0) {$w(x),\,r(y)$};
+\node[prop] (p1) at (4.9,1.2) {$w(y)$};
+\draw[ccmuted, line width=0.6pt] (3.75,1.7) -- (3.75,-0.5);
+\node[lab, ccmuted, anchor=south] at (3.75,1.7) {frontier $\phi$};
+\node[lab, ccmuted] at (1.6,-0.55) {committed};
+\node[lab, ccmuted] at (4.9,-0.55) {proposed};
+% edges
+\draw[S] (p0) -- (p1) node[midway, above, lab, ccblue] {S};
+\draw[C] (p0) -- (q)  node[midway, left=1pt, lab, ccorange] {C on $x$};
+\draw[C] (q)  -- (p1) node[midway, right=2pt, lab, ccorange] {C on $y$};
+\end{tikzpicture}
+\caption{The impossibility witness of Corollary~\ref{cor:imp}. $W_0$ has
+committed a read of $x$; $W_1$ has committed a piece that wrote $x$ and read
+$y$. $W_0$ now proposes to write $y$. The cycle is mixed and passes through
+$W_0$'s committed read. $W_0$'s remainder is already a single piece, so there
+is nothing left to merge, and $W_1$ having finished does not remove its
+edges.}
+\label{fig:witness}
+\end{figure}
+
+\paragraph{Waiting does not help.}
+The practically important part of Corollary~\ref{cor:imp} is that the refusal
+cannot be waited out. One might hope that letting all other workflows finish
+would dissolve the conflict. It does not. A workflow that has fully committed
+still contributes its S~clique and its C~edges, because those interleavings
+really happened. Figure~\ref{fig:witness} shows the smallest instance: $W_1$
+is finished, $W_0$'s remainder is a single piece, and the cycle is still
+there. The schedule it stands for is a real anomaly---$W_0$ read $x$ before
+$W_1$ wrote it, so $W_0$ precedes $W_1$; $W_1$ read $y$ before $W_0$ writes
+it, so $W_1$ precedes $W_0$. The runtime's options are to refuse the revision
+or to run a compensating action for the committed prefix, which is an
+application-level obligation rather than a graph property.
+
+\subsection{Admission must be serialized}
+
+\begin{theorem}[Serialized admission]
+\label{thm:serial}
+Two revisions that are each admissible against a common plan snapshot may be
+jointly inadmissible. Admission decisions must therefore be evaluated and
+installed one at a time against a single plan snapshot.
+\end{theorem}
+
+\begin{proof}
+By counterexample. $W_0$ has committed a read of $x$ and $W_1$ a read of $y$.
+$W_0$ proposes to write $y$ and $W_1$ proposes to write $x$. Against the
+common snapshot, each revision alone adds one C~edge and creates no cycle, so
+each is admitted. Applied together, the plan contains the cycle
+$r_0(x)$--$w_0(y)$--$r_1(y)$--$w_1(x)$--$r_0(x)$, which alternates S and
+C~edges, and the plan admits a non-serializable execution.
+\end{proof}
+
+The runtime therefore evaluates and installs revisions under a single
+admission lock, which also fixes the frontier used for sealing. A piece that
+is currently executing is treated as immutable, exactly like a committed one,
+so that a concurrent admission cannot regroup a piece another thread is
+running.
+
+\subsection{The admission algorithm}
+
+\begin{algorithm}[t]
+\caption{Admitting a plan revision}
+\label{alg:admit}
+\begin{algorithmic}[1]
+\Require current plan $P$, frontier $\phi$, proposed revision of workflow $r$
+\Ensure an installed plan, or a refusal with a witness cycle
+\State \textbf{acquire} the admission lock \Comment{Theorem~\ref{thm:serial}}
+\State $P' \gets P$ with $r$'s uncommitted suffix replaced
+\If{$P'$ is SC-cycle-free}
+  \State \Return \textsc{Admit}$(P')$ \Comment{finest plan, unchanged}
+\EndIf
+\State $S \gets \seal(P',\phi)$
+\If{$S$ has a mixed simple cycle $c$}
+  \State \Return \textsc{Refuse}$(c)$ \Comment{Corollary~\ref{cor:imp}}
+\EndIf
+\Repeat \Comment{guided coarsening, suffix only}
+  \ForAll{mixed biconnected blocks $b$ of $P'$}
+    \State pick a workflow $w$ with an S~edge in $b$ beyond $\phi(w)$
+    \State merge the interval of $w$ whose merge adds the least
+      footprint~$\times$~duration
+  \EndFor
+\Until{$P'$ is SC-cycle-free}
+\State \Return \textsc{AdmitCoarsened}$(P')$
+\end{algorithmic}
+\end{algorithm}
+
+Algorithm~\ref{alg:admit} proceeds in three steps. It first certifies the
+proposed plan as given, because when the proposal already certifies we want
+the finest plan, not the coarsest. If that fails it tests the sealing; by
+Theorem~\ref{thm:char} a failure here is final, and the algorithm returns the
+witness cycle and the workflows it implicates so that the application can
+choose compensation or an alternative plan. Otherwise it runs a guided
+coarsening restricted to pieces at or beyond the frontier. Each pass repairs
+every mixed block and chooses, per workflow, the merge that adds the least
+footprint-duration area, a proxy for how much additional lock holding the
+merge causes. Each pass strictly reduces the number of pieces, so the loop
+terminates, and by Theorem~\ref{thm:char} it must succeed once the sealing has
+certified.
+
+The same algorithm with an empty frontier is the launch-time certifier: it
+takes the finest chopping the agents declare and returns the finest plan it
+can certify.

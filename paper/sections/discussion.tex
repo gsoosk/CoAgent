@@ -1,0 +1,87 @@
+\section{Discussion and Limitations}
+\label{sec:discussion}
+
+\paragraph{What a system designer should take away.}
+The result we would emphasize is not a speedup. It is that the admissibility
+question for mid-flight revisions has a clean answer, that the answer is often
+no, and that no runtime cleverness changes it once effects are visible. This
+argues for three design practices: declare contingent footprints before
+committing anything; treat the first visible effect of a workflow as a
+commitment boundary in agent design, not an implementation detail; and, where
+neither is possible, provide compensation. The whole-workflow baselines avoid
+the problem by reserving the conservative union footprint in advance, which is
+precisely the cost chopping tries to avoid.
+
+\paragraph{Improvisation consumes certified pieces.}
+The \cell{cc-claim} result with Sonnet (\S\ref{sec:eval:agent}) exposes a
+hazard specific to model-driven agents. The runtime infers which piece a call
+belongs to, and a piece closes when its call returns. A model that inserts an
+extra, harmless-looking read can therefore commit the piece its later write
+was certified under and turn its own admissible plan into an inadmissible
+one. Two mitigations follow directly. Footprints can distinguish ``may read''
+from ``will write'', so that a read does not close a piece that still owes a
+write. And the tool interface can expose the atomic operation the certificate
+actually covers, such as a single read-modify-write call, instead of its
+parts.
+
+\paragraph{Refining priority-ordered locking.}
+\ccs pays for deadlock freedom on every conflict with a lower-priority holder,
+including conflicts that would have resolved by a short wait
+(\S\ref{sec:eval:locking}). The refinement is to wait by default and wound
+only when waiting would close a cycle in the wait-for graph, using $\sigma$
+only to choose the victim. Our measurements predict its effect cell by cell:
+it should leave the ten cells on which 2PL deadlocks unchanged and recover the
+two on which it does not.
+
+\paragraph{Relaxing refusal.}
+The admission criterion is static, so it quantifies over all executions of the
+revised plan, including executions that the history already fixed has ruled
+out. A hybrid criterion that combines the \emph{directed} dependencies
+observed among committed pieces with static conflicts over the future should
+admit strictly more revisions while remaining sound.
+Theorem~\ref{thm:char} gives the exact baseline it must beat. Runtime
+techniques from the chopping literature that order or track dependencies
+between pieces~\cite{zhang2013chains,xie2015callas,wang2016ic3} suggest how.
+
+\paragraph{Threats to validity.}
+\emph{Scale.} Each cell runs two agents for ten seeds. With 100 to 120 trials
+per protocol, differences of a few points in anomaly-free rate are not
+significant, and we have not claimed them. The speed comparisons are paired
+by cell and significant where stated, but a cell is a hand-built workload, not
+a sample of production traffic. We do not know how often safe cuts occur in
+real agent workloads; the 100\% launch-time merge rate on our contended cells
+is a property of cells designed to be contended.
+
+\emph{Time.} The agent study measures time on a virtual clock driven by real
+inference latencies, with no network or tool latency; the mechanism study uses
+real threads and real time but a fixed reasoning delay. Neither is an
+end-to-end measurement of deployed agents, and an optimistic policy that
+discards a long generation pays more in practice than a fixed delay charges
+it.
+
+\emph{Coverage.} The Sonnet run does not include \cctwo and \ccs, so every
+claim about those two disciplines rests on one model. \mtpo is our
+re-implementation from the published description, and the choices we made
+where that description is open are documented in the artifact. One of
+them---whether a notification refreshes the agent's premise in place or
+prompts it to re-read---bears on \mtpo's result on lost-update cells, and a
+different reading might score higher there. Two Haiku cells are excluded from aggregates because
+the model fails them alone.
+
+\emph{Footprints.} Footprints are supplied with the tools rather than
+inferred from tool implementations. We evaluate the enforcement of footprints,
+not their derivation, and a footprint that is too narrow turns into refusals
+rather than anomalies only because enforcement is fail-closed.
+
+\emph{Abort granularity.} In the agent runtime an abort restarts the whole
+workflow and compensates writes of pieces it had already committed, which
+another workflow could in principle have observed; a faithful implementation
+of rule E4 restarts only the aborted piece from its progress record, as the
+durable runtime does. The exposure was small in our runs---86 of 90 wounds
+and all deadlock aborts had no write to compensate---but it is a gap between
+the prototype and the model.
+
+\emph{Environment.} State is a single store, in memory for the agent study
+and a local SQLite database for the mechanism study. There are no network
+partitions, no distributed participants and no irreversible external effects.
+Verification is bounded and syntactic.

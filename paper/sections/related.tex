@@ -1,0 +1,60 @@
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Transaction chopping and its descendants.}
+Chopping, the SC-graph criterion and the non-removability of cycles under
+refinement are due to Shasha et al.~\cite{shasha1995chopping}; the
+serializability theory underneath is
+classical~\cite{bernstein1987,eswaran1976}. Later systems combine a static
+analysis of pieces with runtime mechanisms to admit executions that a static
+no-cycle test would reject: transaction chains order pieces across
+sites~\cite{zhang2013chains}, Callas groups transactions and applies a
+different mechanism within and across groups~\cite{xie2015callas}, and IC3
+tracks dependencies between pieces at run time~\cite{wang2016ic3}. Chopping
+has also been studied under parallel snapshot isolation, where the permitted
+observers change what is safe~\cite{cerone2015psi}. All of these assume the
+transaction programs are known when the analysis runs. Our criterion is
+deliberately more conservative than the runtime-assisted ones and
+correspondingly cheaper; what we add is the case they do not consider, a
+program that changes after part of it has committed.
+
+\paragraph{Deadlock handling.}
+\ccs applies wound-wait~\cite{rosenkrantz1978} inside pieces, with the
+launch-time order of the workflows as the timestamp. The scheme is old; the
+observation that makes it useful here is that agents tolerate redo better than
+repair, which is an empirical property of models rather than of locks.
+Optimistic control~\cite{kung1981occ} and saga
+compensation~\cite{garciamolina1987sagas} are the basis of our baselines.
+
+\paragraph{Concurrency control for agents.}
+CoAgent~\cite{lyu2026coagent} orders agents at launch and repairs conflicts
+semantically; it is our main point of comparison, and its ordering is what
+\ccs reuses for locks. Where CoAgent assumes a notified agent heals itself,
+we measure how often it does and offer a design in which the corresponding
+failure leaves state clean. Atomix~\cite{mohammadi2026atomix} provides
+transactional tool use with declared effects and leaves the choice of
+transaction granularity to the integration layer; certified chopping is a way
+of making that choice. OptiMA~\cite{calikyilmaz2025optima} schedules
+multi-agent transactions that it treats as indivisible.
+SagaLLM~\cite{chang2025sagallm} applies compensation-based decomposition to
+agent planning and explicitly relaxes isolation, and
+Mnemosyne~\cite{chang2026mnemosyne} admits untrusted agent proposals through
+a deterministic gate, a stance our fail-closed enforcement shares.
+Concurrency anomalies in multi-agent systems have been characterized
+formally~\cite{khan2026verified}. Automatic reconstruction of an agent's read
+set~\cite{khan2026sbus} and adaptive control for agent-generated
+transactions~\cite{zhou2026atcc} are complementary: the first could supply
+the footprints we take as given.
+
+\paragraph{Agent benchmarks.}
+Our contended cells draw their operations from agent benchmarks for cloud
+operations~\cite{chen2025aiopslab} and workplace
+tasks~\cite{styles2024workbench}; $\tau$-bench~\cite{yao2024taubench} is a
+further candidate. These benchmarks run tasks in isolation and therefore do
+not, by themselves, create the contention this problem is about; adapting
+them into concurrent versions is future work.
+
+What we did not find in this body of work is a treatment of plan revision
+over an already-committed prefix, with an admissibility characterization and
+an impossibility result. That is a statement about what our search found, not
+a priority claim.

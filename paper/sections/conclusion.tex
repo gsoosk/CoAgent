@@ -1,0 +1,28 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+Agents interleave, and the classical answer to interleaving assumes plans that
+agents do not have. We identified the resulting problem, admitting a plan
+revision after part of the plan has committed, and characterized it
+completely: a revision can be made safe by regrouping the future if and only
+if sealing the future certifies, and when it does not, neither a finer
+regrouping nor waiting helps. We built a runtime that enforces the hypotheses
+of the certificate instead of assuming them, and showed that the locks inside
+a piece can be ordered by the same priority that repair-based protocols use
+for notifications, which removes deadlock without giving up short holds.
+
+With real agents, certified chopping is as safe as whole-workflow locking and
+safer than repair on the workloads where repair depends on the model; with
+priority-ordered locking it is also as fast as repair. Its failures leave
+state clean rather than corrupted. And it has limits that we measured rather
+than assumed away: when a read-modify-write straddles the reasoning gap the
+right answer is not to chop, and when an agent escalates into shared state
+after committing, the right answer is usually to refuse.
+
+\paragraph{Artifact.}
+The agent runtime, the eight protocols, the twelve cells, the brute-force
+verification suite, every trial record of both model runs, and the scripts
+that produce every table and figure in \S\ref{sec:eval:setup}--\S\ref{sec:eval:revisions}
+are available in the accompanying repository. The durable runtime and its
+verifier reproduce Table~\ref{tab:verify} and \S\ref{sec:eval:mechanism}
+using only the Python standard library.

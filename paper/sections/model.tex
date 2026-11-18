@@ -1,0 +1,78 @@
+\section{Model}
+\label{sec:model}
+
+\paragraph{Intents and workflows.}
+An \emph{intent} is the unit an application wants to be atomic and isolated:
+``roll this deployment back and record that it was done''. An intent is not an
+agent. Several agents can cooperate on one intent, and one long-lived agent
+can execute many, so the transaction identity follows the delegated work
+rather than the process. In this paper each intent is one ordered
+\emph{workflow}; internally parallel intents are future work.
+
+\paragraph{Batches, plans and pieces.}
+A \emph{batch} $B$ is a finite set of workflow invocations. A workflow $w$ has
+a \emph{plan}: an ordered list of \emph{pieces}, each grouping consecutive
+steps, where a step is one mediated tool operation. The pieces of one
+workflow execute in order, and each commits before the next begins. Distinct
+invocations of the same program are distinct workflows; a single
+representative instance would miss the interference between two concurrent
+invocations of the same program.
+
+\paragraph{Footprints.}
+Each piece $p$ carries a declared \emph{footprint} $F(p)$: a set of accesses,
+each an exact key or a half-open key range, marked read or write. A range
+models a predicate query such as ``every deployment in this namespace''. A
+write to a key inside a declared range conflicts with a read of that range,
+which is what makes a phantom insertion visible to certification. Two
+accesses \emph{conflict} when their items overlap and at least one is a write:
+\begin{align*}
+\mathit{conflict}(p,q) \iff{} & \exists\, a\in F(p),\, b\in F(q):\\
+ & a \text{ and } b \text{ overlap and one is a write.}
+\end{align*}
+
+\paragraph{The SC graph.}
+The SC graph of a plan is undirected. Its vertices are the pieces of every
+workflow in the batch. An S~edge joins every pair of pieces of the same
+workflow, so each workflow's pieces form a clique. A C~edge joins conflicting
+pieces of different workflows. The forbidden structure is a \emph{mixed simple
+cycle}: a simple cycle with at least one S~edge and at least one C~edge. Pure
+S~cycles and pure C~cycles are permitted, and a mixed closed walk that repeats
+a vertex does not count. A plan with no mixed simple cycle is
+\emph{SC-cycle-free}, and we say it \emph{certifies}.
+
+We detect mixed simple cycles by computing the vertex-biconnected components
+of the graph and rejecting any component that contains both edge labels. The
+test is exact, because any two edges of a biconnected component lie on a
+common simple cycle, and it runs in time linear in the size of the graph.
+
+\paragraph{Execution rules.}
+A certificate is a statement about a plan; it becomes a statement about an
+execution only if the runtime upholds four obligations. These are the
+classical execution rules of chopping~\cite{shasha1995chopping}, restated for
+a tool runtime:
+\begin{enumerate}
+\item[\textbf{E1}] Each piece executes serializably with respect to all other
+  pieces. Several atomic tool calls grouped under one label are not an atomic
+  piece.
+\item[\textbf{E2}] The pieces of a workflow execute in program order.
+\item[\textbf{E3}] The declared footprint of a piece bounds its actual
+  accesses.
+\item[\textbf{E4}] A piece aborted by contention is retried until it commits.
+\end{enumerate}
+E3 is where an agent runtime differs most from a database. A stored procedure
+can be analysed; a model-driven agent cannot, and a model-generated
+description of what a tool does is not evidence about what it does. The
+runtime of \S\ref{sec:runtime} therefore enforces E3 on every call rather than
+assuming it.
+
+\paragraph{What a certificate does and does not buy.}
+A certificate is a statement about isolation under the declared model.
+It is not \emph{atomicity}: independently committed pieces leave a visible
+prefix if the process dies, which must be repaired by durable continuation
+(\S\ref{sec:runtime}). It is not \emph{consistency}: serializability preserves
+an application invariant only if each workflow is individually correct, and a
+model that misreads its task produces a serializable wrong answer. It is not
+\emph{real-time ordering}: conflict serializability does not imply strict
+serializability. And it says nothing about effects outside the modelled
+state. A message that has been sent stays sent; a graph cannot create rollback
+for a service that does not offer it.

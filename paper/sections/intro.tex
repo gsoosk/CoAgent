@@ -1,0 +1,120 @@
+\section{Introduction}
+\label{sec:intro}
+
+Two agents are asked to resize the same Kubernetes deployment at the same
+time. One doubles the replica count to absorb a load spike; the other adds
+three replicas for headroom. Each reads the current count, reasons about what
+to do, and writes back a new value. Starting from four replicas, the only
+defensible outcomes are $11$ (double, then add) and $14$ (add, then double).
+We ran this workload with two concurrent language-model agents and no
+coordination. In every one of twenty trials, across two different models, both
+agents read~$4$ and the final count was $7$ or $8$: one update was lost.
+Neither agent reasoned incorrectly. Each computed the right value from what it
+read. The anomaly is a concurrency-control failure, and no amount of prompt
+engineering removes it.
+
+\paragraph{Three answers, three costs.}
+The database community has seen this problem before, and each classical answer
+carries over to agents with a specific cost.
+
+\emph{Make every tool call a transaction.} This is what most agent frameworks
+do implicitly. It is fast and wrong: the unit an application wants to be
+atomic is the agent's \emph{intent}---read, decide, write---not the individual
+call, and the lost update above lives precisely in the gap between calls.
+
+\emph{Make the whole workflow a transaction.} This is correct, but the
+workflow includes the agent's reasoning, which is by far its longest part.
+Holding locks across model inference serializes exactly the interval one
+would most like to overlap. In our measurements, whole-workflow two-phase
+locking is barely faster than running the agents one after another
+($1.06\times$).
+
+\emph{Let agents run, and repair conflicts afterwards.} Recent systems order
+agents by a launch-time priority, apply writes speculatively, and notify an
+agent when a premise it read has changed, relying on the agent to repair its
+own work~\cite{lyu2026coagent}. This is fast, but it moves the correctness
+argument into the model: the protocol is serializable only if a notified agent
+correctly decides whether its plan is affected and correctly repairs it. We
+measure that assumption directly; it holds in 91\% of notified trials for a
+small model and 95\% for a large one, and when it fails on an append-only log
+the wrong record cannot be withdrawn.
+
+\paragraph{Chopping, and what breaks it.}
+Transaction chopping~\cite{shasha1995chopping} resolves the tension between
+the first two answers for classical workloads. A transaction is split into
+pieces that execute and commit independently, so that locks are released
+between pieces, and a static graph test guarantees that every interleaving of
+pieces is equivalent to some serial execution of the original transactions.
+For an agent, the natural place to cut is the reasoning gap: commit the read,
+think without holding anything, then write.
+
+The classical theorem, however, assumes that the set of transaction programs
+is known before execution. An agent violates this assumption in a specific,
+consequential way: \emph{it decides what to do next after seeing what it just
+read}. A support agent reads an order and only then discovers that the
+resolution requires touching a shared gift-card balance. By that point the
+read has committed and its result has been returned. The plan that was
+certified is no longer the plan being executed.
+
+One can recertify the revised plan, and that is sound. The difficulty is what
+to do when recertification fails. Before execution, a failed certification is
+always repairable: merge pieces until, in the limit, each workflow is a single
+piece. After a prefix has committed, that repair is unavailable, because
+merging a committed piece with a future one is not a physical operation. The
+question is whether some weaker repair always exists. We show that it does
+not, and we characterize exactly when it does.
+
+\paragraph{Contributions.}
+\begin{itemize}
+\item We formalize \emph{prefix-aware recertification}: admitting a plan
+  revision against a batch in which some pieces have already committed and
+  only the uncommitted suffix may be regrouped (\S\ref{sec:model},
+  \S\ref{sec:theory}).
+\item We prove a complete characterization (Theorem~\ref{thm:char}): a
+  revision is admissible under future-only repair if and only if sealing
+  every workflow's uncommitted remainder into one piece yields an
+  SC-cycle-free plan. This reduces admission to a single cheap test and tells
+  the runtime when searching finer choppings is pointless.
+\item We prove the corresponding impossibility result
+  (Corollary~\ref{cor:imp})---waiting for concurrent workflows to finish does
+  not rescue an inadmissible revision---and show that admission must be
+  serialized (Theorem~\ref{thm:serial}).
+\item We build a runtime that enforces the certificate's hypotheses rather
+  than trusting them (\S\ref{sec:runtime}): every tool access is mediated and
+  checked fail-closed against the footprint of the executing piece, predicate
+  reads are ranges so that phantoms are visible to certification, and pieces
+  are isolated by locking. We study three locking disciplines inside a piece.
+  The third, \ccs, orders lock waits by the same launch-time priority that
+  repair-based protocols use for notifications, which makes deadlock
+  unreachable while keeping holds short.
+\item We check every soundness claim against a brute-force serializability
+  oracle (\S\ref{sec:verification}) and evaluate with real language-model
+  agents on twelve contended workloads, two models, five baselines and
+  three variants of our own, 1{,}682 trials in total (\S\ref{sec:eval}).
+\end{itemize}
+
+\paragraph{Summary of results.}
+With a small model driving both agents, \ccs is anomaly-free in 98\% of
+trials, against 96\% for whole-workflow locking and 93\% for the repair-based
+protocol. On the contended workloads it is as fast as the repair-based
+protocol ($1.33\times$ versus $1.38\times$ over serial; the difference is
+not significant) and significantly faster than whole-workflow locking
+($+0.27\times$, faster on eight of eight workloads). Where the structure of
+the workload permits a cut, it reaches $2.15\times$ while whole-workflow
+locking stays at $0.98\times$. It never deadlocks, and in that run it is the
+only protocol whose slowest workload is still faster than serial execution.
+
+We are equally explicit about what does not work. On ten of our twelve
+workloads a read-modify-write or scan-then-insert straddles the reasoning gap,
+and certification correctly refuses to cut there. Most mid-flight escalations
+into shared state are inadmissible: between 4\% and 37\% are admitted in a
+controlled study, and 19\% with a large model on live agents. Certified
+chopping does not remove the dependence on the agent; it relocates it, from
+\emph{repairing a record correctly} to \emph{retrying after a refusal}, and
+changes what a failure costs.
+
+We do not claim a new isolation theorem for static choppings, a general ACID
+protocol for agents, or the first transactional treatment of agent tool use.
+Our contribution is the revision-admission problem and its solution, a runtime
+that enforces it, and an evaluation that reports both where the approach wins
+and where the right answer is not to chop.

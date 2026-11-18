@@ -1,0 +1,140 @@
+\section{Background and Motivation}
+\label{sec:background}
+
+\subsection{Agent tool workflows}
+
+An agent is a loop around a language model. In each round the model receives
+the task and everything observed so far, and emits either a \emph{tool call}
+or a statement that it is done. A tool call reads or writes shared state: a
+deployment, a calendar, a customer record. The result of the call is appended
+to the model's context, and the loop continues.
+
+Two properties of this loop matter for concurrency control. First, the
+interval between two tool calls is a model inference. It takes seconds, it is
+private to the agent, and it touches no shared state. We call it the
+\emph{reasoning gap}. Second, the sequence of calls is not known in advance:
+which tool the agent calls next depends on what the last call returned.
+
+When several agents work on the same system, their tool calls interleave. The
+result is the familiar catalogue of anomalies~\cite{bernstein1987}. Two agents
+that both read a value, reason, and write a derived value lose an update. An
+agent that scans a collection and then acts on what it saw misses an object
+another agent inserted in between, a phantom~\cite{eswaran1976}. An agent that
+appends a record derived from a value another agent has since overwritten
+leaves a log that no serial execution could have produced.
+
+\subsection{Existing answers}
+
+\paragraph{Whole-workflow isolation.} Treating each agent's entire workflow
+as one transaction prevents every anomaly above. Under strict two-phase
+locking (2PL) the agent holds each lock from first use until it finishes;
+under optimistic concurrency control (OCC)~\cite{kung1981occ} it runs
+unlocked and validates at the end. Because the target systems that agents
+operate on---a Kubernetes API, a CRM---offer neither private workspaces nor
+rollback, writes land in place, and an abort is implemented as a
+saga~\cite{garciamolina1987sagas}: each tool registers an inverse, and a
+victim's writes are undone by running the inverses. The cost of both policies
+is tied to the reasoning gap. 2PL holds locks across it; OCC discards a whole
+workflow's worth of inference when validation fails.
+
+\paragraph{Ordered repair.} CoAgent~\cite{lyu2026coagent} takes the opposite
+position. Its protocol, \mtpo, assigns every agent a rank $\sigma$ at launch
+and aims for the outcome of running the agents serially in $\sigma$ order.
+Reads return the value the reader would have seen in that order; writes apply
+speculatively in place; and when a lower-ranked agent overwrites something a
+higher-ranked agent has read, the higher-ranked agent receives a
+\emph{notification} carrying the new value. Notifications flow in one
+direction only, from lower $\sigma$ to higher. Nobody blocks and nothing is
+undone, which makes \mtpo fast. Its correctness, however, rests on two
+assumptions about the model: that an agent completes its task correctly in
+isolation (A1), and that a notified agent correctly judges whether its plan is
+affected and repairs exactly the affected operations (A3). CoAgent assumes
+A3 holds 95\% of the time. We return to both assumptions in
+\S\ref{sec:eval:agent}.
+
+\subsection{Transaction chopping}
+
+Transaction chopping~\cite{shasha1995chopping} asks a different question:
+which transactions can be cut into smaller ones without anyone being able to
+tell? A \emph{chopping} splits each transaction into consecutive
+\emph{pieces}. Each piece executes as its own serializable transaction and
+commits before the next begins, so locks are held only within a piece.
+
+Whether a chopping is safe is decided by an undirected graph over the pieces,
+the \emph{SC graph}. Two pieces of the same transaction are joined by an
+\emph{S~edge} (sibling). Two pieces of different transactions that access a
+common item, at least one of them writing it, are joined by a \emph{C~edge}
+(conflict). The chopping is correct---every execution is equivalent to a
+serial execution of the \emph{original} transactions---if the graph has no
+simple cycle containing both an S~edge and a C~edge.
+
+\begin{figure}[t]
+\centering
+\begin{tikzpicture}[
+  piece/.style={draw=ccmuted, rounded corners=2pt, minimum height=5mm,
+                minimum width=11mm, font=\scriptsize, inner sep=1.5pt},
+  S/.style={ccblue, line width=0.9pt},
+  C/.style={ccorange, line width=0.9pt, dashed},
+  lab/.style={font=\scriptsize}]
+% ---- (a) choppable ------------------------------------------------------
+\node[lab] at (1.05,1.75) {(a) certifiable};
+\node[lab, anchor=east] at (-0.1,1.1) {$A$};
+\node[lab, anchor=east] at (-0.1,0.0) {$B$};
+\node[piece] (a1) at (0.5,1.1) {$r(\mathit{pool})$};
+\node[piece] (a2) at (1.9,1.1) {$w(c_A)$};
+\node[piece] (b1) at (0.5,0.0) {$w(\mathit{pool})$};
+\node[piece] (b2) at (1.9,0.0) {$w(c_B)$};
+\draw[S] (a1) -- (a2);
+\draw[S] (b1) -- (b2);
+\draw[C] (a1) -- (b1);
+% ---- (b) not choppable --------------------------------------------------
+\begin{scope}[xshift=4.0cm]
+\node[lab] at (1.05,1.75) {(b) mixed cycle};
+\node[lab, anchor=east] at (-0.1,1.1) {$A$};
+\node[lab, anchor=east] at (-0.1,0.0) {$B$};
+\node[piece] (c1) at (0.5,1.1) {$r(x)$};
+\node[piece] (c2) at (1.9,1.1) {$w(x)$};
+\node[piece] (d1) at (0.5,0.0) {$r(x)$};
+\node[piece] (d2) at (1.9,0.0) {$w(x)$};
+\draw[S] (c1) -- (c2);
+\draw[S] (d1) -- (d2);
+\draw[C] (c1) -- (d2);
+\draw[C] (c2) -- (d1);
+\draw[C] (c2) -- (d2);
+\end{scope}
+% ---- legend ---------------------------------------------------------------
+\draw[S] (0.6,-0.75) -- (1.2,-0.75) node[right, lab, black] {S edge (same workflow)};
+\draw[C] (3.9,-0.75) -- (4.5,-0.75) node[right, lab, black] {C edge (conflict)};
+\end{tikzpicture}
+\caption{SC graphs for two agent workflows cut at the reasoning gap. (a)~$A$
+reads a shared pool and writes a private claim while $B$ updates the pool: the
+only conflict joins the two first pieces, no cycle mixes edge types, and the
+chopping is safe. (b)~Both agents read and then write the same object: the
+cycle $r_A(x)$--$w_A(x)$--$w_B(x)$--$r_A(x)$ mixes an S~edge with C~edges, so
+the cut would permit a lost update and each workflow must stay one piece.}
+\label{fig:sc}
+\end{figure}
+
+Figure~\ref{fig:sc} shows the two cases that matter for agents. When the
+shared dependency is short and the work that follows is private, cutting at
+the reasoning gap is safe, and the lock on the shared item is released before
+the model starts thinking. When a read-modify-write straddles the gap, the
+graph has a mixed cycle and the cut must not be made. The repair is always
+available before execution: merge pieces. A workflow that is a single piece
+has no S~edges, so it cannot be on a mixed cycle.
+
+\subsection{Why agents break the classical setting}
+
+The chopping theorem quantifies over a set of transaction programs that is
+fixed before any piece runs. An agent's plan is not fixed. Suppose a workflow
+is certified as ``read $x$; then write a private result'', the read commits,
+and the agent then decides, on the basis of what it read, that it must also
+write a shared item $y$. The certified plan no longer describes the execution.
+
+Two responses are unsound or unavailable. Certifying only the new suffix is
+unsound, because the conflicts that close a cycle may run through the pieces
+that already committed. Merging the new write into the piece that performed
+the read is unavailable, because that piece has committed and released its
+locks; other workflows may already have observed its effects or interleaved
+with it. What remains is to regroup the \emph{uncommitted} part of the plan,
+and the question this paper answers is when that is enough.
