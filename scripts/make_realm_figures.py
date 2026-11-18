@@ -84,6 +84,10 @@ def main() -> int:
     ap.add_argument("--summary", default=str(ROOT / "results/realm/summary.json"))
     ap.add_argument("--out", default=str(ROOT / "results/realm/figures/fig_realm.png"))
     ap.add_argument("--model", default="claude-haiku-4-5")
+    ap.add_argument("--title", default="REALM-Bench P3 urban ride-sharing, "
+                    "three concurrent vehicle dispatchers")
+    ap.add_argument("--goal", default="passengers served",
+                    help="what REALM's goal-satisfaction metric counts here")
     args = ap.parse_args()
 
     summary = json.loads(Path(args.summary).read_text())
@@ -94,10 +98,19 @@ def main() -> int:
     (a, b, c), (d, e, f) = axes
 
     # (a) isolation: consistent trials, and why the others were not
-    stack = (("af", "consistent", BLUE),
-             ("primary:routing error", "routing error (agent)", GREY),
-             ("primary:wrong release", "wrong release", ORANGE),
-             ("primary:double claim", "double claim", VIOLET))
+    colours = {"routing error": (GREY, "routing error (agent)"),
+               "ignored booking": (GREY, "ignored a visible booking (agent)"),
+               "wrong release": (ORANGE, "wrong release"),
+               "failed heal": (ORANGE, "failed heal (MTPO)"),
+               "double claim": (VIOLET, "double claim (stale read)"),
+               "double booking": (VIOLET, "double booking (stale read)")}
+    present = [c for c in ("routing error", "ignored booking",
+                           "wrong release", "failed heal", "double claim",
+                           "double booking")
+               if any(d.get("primary:" + c) for ps in summary.values()
+                      for d in ps.values())]
+    stack = (("af", "consistent", BLUE),) + tuple(
+        ("primary:" + c, colours[c][1], colours[c][0]) for c in present)
     for i, p in enumerate(protos):
         n = sum(per_instance(summary, p, "n"))
         base = 0.0
@@ -115,7 +128,7 @@ def main() -> int:
     a.set_ylim(0, 140)
     a.set_yticks(range(0, 101, 20))
     a.set_ylabel("trials (%)", fontsize=8.5, color=MUTED)
-    a.set_title("(a) dispatch consistency, and the cause when broken",
+    a.set_title("(a) consistent trials, and the cause when not",
                 fontsize=9.5, loc="left")
     a.legend(handles=[Patch(facecolor=c, label=l) for _, l, c in stack],
              fontsize=7, frameon=False, loc="upper center", ncol=2,
@@ -147,7 +160,7 @@ def main() -> int:
     d.set_ylabel("REALM-Bench metric (%)", fontsize=8.5, color=MUTED)
     d.set_title("(d) plan quality, REALM-Bench metrics", fontsize=9.5,
                 loc="left")
-    d.legend(handles=[Patch(facecolor=BLUE, label="passengers served"),
+    d.legend(handles=[Patch(facecolor=BLUE, label=args.goal),
                       Patch(facecolor=ORANGE, label="constraints satisfied")],
              fontsize=7.5, frameon=False, loc="upper left", ncol=2)
     tidy(d, protos)
@@ -178,8 +191,8 @@ def main() -> int:
     f.set_title("(f) model latency per call", fontsize=9.5, loc="left")
 
     fig.suptitle(
-        f"REALM-Bench P3 urban ride-sharing, three concurrent vehicle "
-        f"dispatchers ({args.model}; {n_inst} instances, "
+        f"{args.title} ({args.model}; {n_inst} instance"
+        f"{'s' if n_inst != 1 else ''}, "
         f"{sum(per_instance(summary, protos[0], 'n'))} trials per protocol)",
         fontsize=10.5, x=0.01, ha="left", color=INK)
     fig.tight_layout(rect=(0, 0, 1, 0.96))

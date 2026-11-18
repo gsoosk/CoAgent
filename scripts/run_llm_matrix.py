@@ -42,12 +42,15 @@ from coagent.runtime import CallKind, Runtime          # noqa: E402
 from coagent.workloads import CELLS as _BENCH_CELLS     # noqa: E402
 from coagent.workloads.reorder_cells import REORDER_CELLS  # noqa: E402
 from coagent.workloads.realm_urs import REALM_CELLS     # noqa: E402
+from coagent.workloads.realm_jssp import JSSP_CELLS     # noqa: E402
+from coagent.workloads.realm_wedding import WEDDING_CELLS  # noqa: E402
 from coagent.workloads.base import invariant_ok, normalize  # noqa: E402
 
 
 # The reorder and REALM cells are addressable by name but are not part of
 # "all", so the benchmark matrix stays the twelve cells it was scored on.
-CELLS = {**_BENCH_CELLS, **REORDER_CELLS, **REALM_CELLS}
+CELLS = {**_BENCH_CELLS, **REORDER_CELLS, **REALM_CELLS, **JSSP_CELLS,
+         **WEDDING_CELLS}
 
 
 class _JudgeStub:
@@ -109,6 +112,9 @@ def main() -> int:
     ap.add_argument("--protocols", nargs="*", default=["MTPO"],
                     help="protocol names, or 'all'")
     ap.add_argument("--trials", type=int, default=5)
+    ap.add_argument("--first-seed", type=int, default=0,
+                    help="seeds run are first-seed .. first-seed+trials-1, so "
+                         "one cell's seeds can be split across processes")
     ap.add_argument("--provider", default="openrouter",
                     choices=["openrouter", "anthropic"],
                     help="openrouter/deepseek reproduces the paper; "
@@ -153,12 +159,13 @@ def main() -> int:
 
     out_path = Path(args.out)
     seen = set() if args.force else done_keys(out_path)
+    seeds = range(args.first_seed, args.first_seed + args.trials)
     if args.interleave:
-        plan = [(c, p, s) for c in cells for s in range(args.trials)
+        plan = [(c, p, s) for c in cells for s in seeds
                 for p in protos if (c, p, s) not in seen]
     else:
         plan = [(c, p, s) for c in cells for p in protos
-                for s in range(args.trials) if (c, p, s) not in seen]
+                for s in seeds if (c, p, s) not in seen]
 
     est = price(model, EST_PROMPT, EST_COMPLETION) * len(plan)
     print(f"provider   {args.provider}")
@@ -261,11 +268,9 @@ def main() -> int:
             if cell.anomaly_free is not None:
                 rec["anomaly_free"] = bool(
                     cell.anomaly_free(rec["final_state"], refs))
-            if cell.suite == "realm":
-                # REALM-Bench's own plan-quality metrics for the same state
-                from coagent.workloads.realm_eval import evaluate
-                rec["realm"] = evaluate(cell.llm_spec["instance"],
-                                        rec["final_state"])
+            if cell.quality is not None:
+                # the external benchmark's own plan-quality metrics
+                rec["realm"] = cell.quality(rec["final_state"])
             if hasattr(protocol, "stats"):
                 rec["proto_stats"] = protocol.stats()
             if getattr(protocol, "plan", None) is not None:

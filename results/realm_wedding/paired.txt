@@ -1,0 +1,7 @@
+paired over 10 (instance, seed) pairs, 95% bootstrap CI
+  chopping-prio  vs 2PL-saga  speed x1.05 [0.94, 1.20]  cost x0.87 [0.77, 0.98]  consistent -0.10 [-0.30, +0.00]
+  chopping-prio  vs MTPO      speed x0.59 [0.47, 0.76]  cost x1.21 [0.99, 1.47]  consistent +0.00 [-0.30, +0.30]
+  chopping-prio  vs serial    speed x1.16 [0.92, 1.54]  cost x1.23 [0.97, 1.51]  consistent +0.10 [-0.20, +0.40]
+  MTPO           vs 2PL-saga  speed x1.78 [1.33, 2.24]  cost x0.72 [0.59, 0.89]  consistent -0.10 [-0.30, +0.00]
+  MTPO           vs serial    speed x1.96 [1.34, 2.82]  cost x1.02 [0.74, 1.32]  consistent +0.10 [-0.20, +0.40]
+  2PL-saga       vs serial    speed x1.11 [0.92, 1.41]  cost x1.41 [1.07, 1.77]  consistent +0.20 [+0.00, +0.50]

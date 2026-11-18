@@ -291,7 +291,13 @@ def urs_cell(instance_id: str) -> Cell:
         anomaly_free=lambda final, refs: consistent_dispatch(final, vehicles),
         llm_spec={"tasks": [task_text(inst, v) for v in inst["vehicles"]],
                   "tools": TOOLS, "instance": instance_id},
+        quality=lambda final: _quality(instance_id, final),
     )
+
+
+def _quality(instance_id: str, final: Dict[str, Any]) -> Dict[str, Any]:
+    from .realm_eval import evaluate      # realm_eval imports this module
+    return evaluate(instance_id, final)
 
 
 # The first three P3 instances with three vehicles and at least six

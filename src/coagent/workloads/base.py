@@ -40,6 +40,9 @@ class Cell:
     # task per agent, plus the tool catalog it may call. Declared as plain
     # data so the workload package stays free of the HTTP backend.
     llm_spec: Optional[Dict[str, Any]] = None
+    # Plan quality for an external benchmark (REALM-Bench's metrics),
+    # recorded per trial next to the isolation verdict. final -> metrics.
+    quality: Optional[Callable[[Dict[str, Any]], Dict[str, Any]]] = None
 
     def fresh_target(self) -> TargetSystem:
         return TargetSystem(copy.deepcopy(self.initial))
