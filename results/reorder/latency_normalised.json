@@ -1,0 +1,52 @@
+{
+ "2PL-prio": {
+  "k8s-canary": 1.0182350290296098,
+  "k8s-port-misconfig": 0.7186528549432477,
+  "k8s-permission-revoke": 1.1503515670705364,
+  "k8s-replica-scale": 0.9976861959970678,
+  "wb-crm-dedupe": 1.0295456453986913,
+  "wb-calendar-doublebook": 0.9690105740604292,
+  "wb-analytics-restate": 1.0533707588130135,
+  "wb-project-rebalance": 1.0482676475133532
+ },
+ "chopping": {
+  "k8s-canary": 0.8571428571428571,
+  "k8s-port-misconfig": 0.8888888888888888,
+  "k8s-permission-revoke": 1.0,
+  "k8s-replica-scale": 1.0,
+  "wb-crm-dedupe": 1.0,
+  "wb-calendar-doublebook": 1.0,
+  "wb-analytics-restate": 1.0,
+  "wb-project-rebalance": 1.0
+ },
+ "chopping-2pl": {
+  "k8s-canary": 0.8761088773594271,
+  "k8s-port-misconfig": 0.6855675447695434,
+  "k8s-permission-revoke": 0.9713882764313255,
+  "k8s-replica-scale": 0.9605826457424579,
+  "wb-crm-dedupe": 1.0060534651834736,
+  "wb-calendar-doublebook": 0.9268598296204158,
+  "wb-analytics-restate": 0.9998901263069981,
+  "wb-project-rebalance": 0.9707039724993438
+ },
+ "chopping-2pl-intent": {
+  "k8s-canary": 0.8571428571428571,
+  "k8s-port-misconfig": 0.8,
+  "k8s-permission-revoke": 1.3333333333333333,
+  "k8s-replica-scale": 1.0,
+  "wb-crm-dedupe": 1.0,
+  "wb-calendar-doublebook": 1.0,
+  "wb-analytics-restate": 1.0,
+  "wb-project-rebalance": 1.0
+ },
+ "chopping-prio": {
+  "k8s-canary": 0.9004669317115478,
+  "k8s-port-misconfig": 0.6790014073063562,
+  "k8s-permission-revoke": 1.0206424986117923,
+  "k8s-replica-scale": 1.0082511582001468,
+  "wb-crm-dedupe": 1.016568774085464,
+  "wb-calendar-doublebook": 0.993184533350115,
+  "wb-analytics-restate": 0.9996491726073626,
+  "wb-project-rebalance": 1.0657146347709467
+ }
+}
