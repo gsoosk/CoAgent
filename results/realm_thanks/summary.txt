@@ -1,0 +1,41 @@
+cell          protocol              AF    speed     cost    dlock    wound    notif   s/call    goal%  constr%      opt      min
+realm-p6-thanksgivingserial               3/5     1.00     1.00      0.0      0.0      0.0     6.15       67       93        -        -
+realm-p6-thanksgivingnaive                3/5     3.00     0.92      0.0      0.0      0.0     5.24       60      100        -        -
+realm-p6-thanksgiving2PL-saga             5/5     1.01     1.92      5.8      0.0      0.0     6.04       87       87        -        -
+realm-p6-thanksgivingMTPO                 5/5     2.86     0.98      0.0      0.0      3.0     5.35      100      100        -        -
+realm-p6-thanksgivingchopping-prio        3/5     1.05     1.30      0.0      3.0      0.0     6.57       73      100        -        -
+
+realm-p9-001-thanksgivingserial               5/5     1.00     1.00      0.0      0.0      0.0     6.49       93       93        -        -
+realm-p9-001-thanksgivingnaive                5/5     2.64     0.98      0.0      0.0      0.0     5.19      100      100        -        -
+realm-p9-001-thanksgiving2PL-saga             5/5     0.99     1.81      5.0      0.0      0.0     6.25       93       93        -        -
+realm-p9-001-thanksgivingMTPO                 5/5     2.49     1.03      0.0      0.0      3.0     5.67      100      100        -        -
+realm-p9-001-thanksgivingchopping-prio        5/5     1.31     1.51      0.0      3.0      0.0     5.36      100      100        -        -
+
+realm-p9-002-thanksgivingserial               5/5     1.00     1.00      0.0      0.0      0.0     6.16      100      100        -        -
+realm-p9-002-thanksgivingnaive                4/5     3.00     0.99      0.0      0.0      0.0     5.51       80      100        -        -
+realm-p9-002-thanksgiving2PL-saga             5/5     1.10     2.14      7.2      0.0      0.0     6.31       73       73        -        -
+realm-p9-002-thanksgivingMTPO                 5/5     2.77     0.94      0.0      0.0      3.0     5.14      100      100        -        -
+realm-p9-002-thanksgivingchopping-prio        5/5     1.23     1.39      0.0      3.0      0.0     5.87      100      100        -        -
+
+mean over instances
+  serial          AF 13/15  speed 1.00  cost 1.00  goal 87%  constraints 96%  s/call 6.27
+  naive           AF 12/15  speed 2.88  cost 0.97  goal 80%  constraints 100%  s/call 5.31
+  2PL-saga        AF 15/15  speed 1.04  cost 1.96  goal 84%  constraints 84%  s/call 6.20
+  MTPO            AF 15/15  speed 2.70  cost 0.98  goal 100%  constraints 100%  s/call 5.39
+  chopping-prio   AF 13/15  speed 1.20  cost 1.40  goal 91%  constraints 100%  s/call 5.93
+
+trials with an inconsistency, by cause (pooled over instances)
+  protocol        trials   double booking  ignored booking
+  serial              15                0                2
+  naive               15                3                0
+  2PL-saga            15                0                0
+  MTPO                15                0                0
+  chopping-prio       15                0                2
+
+total spend $3.89 over 75 trials -> results/realm_thanks/summary.json
+protocol         wall s  work s  wasted  blocked  overlap  calls  aborts
+serial               53      53      0%       23     1.00    8.6     0.0
+naive                19      47      0%        0     2.46    8.9     0.0
+2PL-saga             50     121     61%      110     2.61   19.6     6.0
+MTPO                 19      49      0%        0     2.56    9.1     0.0
+chopping-prio        46      78     35%       26     1.70   13.1     3.0

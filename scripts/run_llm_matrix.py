@@ -44,13 +44,15 @@ from coagent.workloads.reorder_cells import REORDER_CELLS  # noqa: E402
 from coagent.workloads.realm_urs import REALM_CELLS     # noqa: E402
 from coagent.workloads.realm_jssp import JSSP_CELLS     # noqa: E402
 from coagent.workloads.realm_wedding import WEDDING_CELLS  # noqa: E402
+from coagent.workloads.realm_tours import TOURS_CELLS     # noqa: E402
+from coagent.workloads.realm_thanksgiving import THANKS_CELLS  # noqa: E402
 from coagent.workloads.base import invariant_ok, normalize  # noqa: E402
 
 
 # The reorder and REALM cells are addressable by name but are not part of
 # "all", so the benchmark matrix stays the twelve cells it was scored on.
 CELLS = {**_BENCH_CELLS, **REORDER_CELLS, **REALM_CELLS, **JSSP_CELLS,
-         **WEDDING_CELLS}
+         **WEDDING_CELLS, **TOURS_CELLS, **THANKS_CELLS}
 
 
 class _JudgeStub:

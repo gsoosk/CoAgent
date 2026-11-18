@@ -38,7 +38,10 @@ def load(paths: List[Path]) -> List[Dict[str, Any]]:
     from coagent.workloads.realm_jssp import JSSP_CELLS
     from coagent.workloads.realm_urs import REALM_CELLS
     from coagent.workloads.realm_wedding import WEDDING_CELLS
-    cells = {**REALM_CELLS, **JSSP_CELLS, **WEDDING_CELLS}
+    from coagent.workloads.realm_tours import TOURS_CELLS
+    from coagent.workloads.realm_thanksgiving import THANKS_CELLS
+    cells = {**REALM_CELLS, **JSSP_CELLS, **WEDDING_CELLS, **TOURS_CELLS,
+             **THANKS_CELLS}
     rows = []
     for p in paths:
         rows += [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
@@ -134,6 +137,13 @@ def _overlaps(r: Dict[str, Any]):
     from coagent.workloads.realm_jssp import MACH, N_MACHINES, _slots, _span
     from coagent.workloads.realm_wedding import CAR, CARS, _windows, errands
     final, out = r["final_state"], []
+    if r["cell"].startswith("realm-p2-tours"):
+        from coagent.workloads.realm_tours import TOURS_CELLS
+        return [(o, f"agent-{a}", f"agent-{b}") for o, a, b in
+                TOURS_CELLS[r["cell"]].llm_spec["conflicts"](final)]
+    if r["cell"].endswith("thanksgiving"):
+        from coagent.workloads.realm_thanksgiving import conflicts
+        return [(o, f"agent-{a}", f"agent-{b}") for o, a, b in conflicts(final)]
     if r["cell"].startswith("realm-jssp"):
         for m in range(N_MACHINES):
             items = [(k, _span(v)) for k, v in _slots(final, m).items()]
@@ -159,7 +169,8 @@ def errands_order() -> List[str]:
 
 
 def booking_causes(r: Dict[str, Any]) -> List[str]:
-    """Why each pair of overlapping bookings overlaps (J1 machines, P5 cars).
+    """Why each pair of overlapping bookings overlaps (J1 machines, P5 cars,
+    P2 guides, P6/P9 people).
 
     double booking   the later booker last read the machine or car before
                      the earlier booking was written: it acted on a stale

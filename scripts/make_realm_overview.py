@@ -30,6 +30,8 @@ BLUE, ORANGE, AQUA, GREY = "#2a78d6", "#eb6834", "#1baf7a", "#9a9994"
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d9d8d3"
 PROBLEMS = [("realm", "P3 ride-sharing", ("get_travel_times", "write_route")),
             ("realm_wedding", "P5 wedding", ("get_travel_times", "write_plan")),
+            ("realm_tours", "P2 campus tours", ("get_travel_times", "write_plan")),
+            ("realm_thanks", "P6/P9 Thanksgiving", ("write_plan",)),
             ("realm_jssp", "J1 job-shop", ("write_schedule",))]
 PROTOS = [("2PL-saga", ORANGE), ("MTPO", AQUA), ("chopping-prio", BLUE)]
 
@@ -73,10 +75,13 @@ def main() -> int:
     data = []
     for d, name, priv in PROBLEMS:
         rows = load(sorted((ROOT / "results" / d / "parts").glob("*.jsonl")))
-        data.append((name, rows, private_share(rows, priv)))
-    labels = [f"{n}\nprivate work {100 * p:.0f}%" for n, _, p in data]
+        if rows:
+            data.append((name, rows, private_share(rows, priv)))
 
-    fig, (a, b) = plt.subplots(1, 2, figsize=(11.5, 4.4))
+    # most private work first, so chopping's gain should fall left to right
+    data.sort(key=lambda d: -d[2])
+    labels = [f"{n}\nprivate work {100 * p:.0f}%" for n, _, p in data]
+    fig, (a, b) = plt.subplots(2, 1, figsize=(11.5, 8.2))
     w = 0.26
     for k, (proto, col) in enumerate(PROTOS):
         for i, (_, rows, _) in enumerate(data):
@@ -100,7 +105,8 @@ def main() -> int:
     for i, (_, rows, _) in enumerate(data):
         rs = [r for r in rows if r["protocol"] == "serial"]
         b.axhline(100 * sum(bool(r["anomaly_free"]) for r in rs) / len(rs),
-                  xmin=(i + 0.08) / 3, xmax=(i + 0.92) / 3, color=MUTED,
+                  xmin=(i + 0.08) / len(data), xmax=(i + 0.92) / len(data),
+                  color=MUTED,
                   ls="--", lw=1.1, zorder=4)
     b.set_ylim(0, 112)
     b.set_ylabel("consistent trials (%)", fontsize=8.5, color=MUTED)

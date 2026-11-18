@@ -1,0 +1,41 @@
+cell          protocol              AF    speed     cost    dlock    wound    notif   s/call    goal%  constr%      opt      min
+realm-p2-tours-001serial               5/5     1.00     1.00      0.0      0.0      0.0     5.10       87       93        -        -
+realm-p2-tours-001naive                0/5     2.09     1.01      0.0      0.0      0.0     4.93       27      100        -        -
+realm-p2-tours-0012PL-saga             5/5     0.83     1.21      4.2      0.0      0.0     5.52       73       73        -        -
+realm-p2-tours-001MTPO                 5/5     2.43     0.92      0.0      0.0      2.6     5.25       73       80        -        -
+realm-p2-tours-001chopping-prio        5/5     2.02     1.02      0.0      3.0      0.0     4.46      100      100        -        -
+
+realm-p2-tours-002serial               5/5     1.00     1.00      0.0      0.0      0.0     4.77       93       93        -        -
+realm-p2-tours-002naive                3/5     2.22     1.04      0.0      0.0      0.0     5.13       53       93        -        -
+realm-p2-tours-0022PL-saga             5/5     1.01     1.27      4.6      0.0      0.0     4.90       67       67        -        -
+realm-p2-tours-002MTPO                 5/5     2.35     0.92      0.0      0.0      1.8     5.88       67       67        -        -
+realm-p2-tours-002chopping-prio        5/5     1.82     1.29      0.0      3.0      0.0     5.18       87       87        -        -
+
+realm-p2-tours-003serial               5/5     1.00     1.00      0.0      0.0      0.0     6.51       33       33        -        -
+realm-p2-tours-003naive                0/5     2.32     1.00      0.0      0.0      0.0     6.21        0       40        -        -
+realm-p2-tours-0032PL-saga             5/5     1.16     1.12      3.4      0.0      0.0     5.47       47       47        -        -
+realm-p2-tours-003MTPO                 5/5     2.70     0.98      0.0      0.0      3.8     5.10       47       47        -        -
+realm-p2-tours-003chopping-prio        5/5     1.99     1.08      0.0      3.0      0.0     5.36       40       40        -        -
+
+mean over instances
+  serial          AF 15/15  speed 1.00  cost 1.00  goal 71%  constraints 73%  s/call 5.46
+  naive           AF  3/15  speed 2.21  cost 1.02  goal 27%  constraints 78%  s/call 5.42
+  2PL-saga        AF 15/15  speed 1.00  cost 1.20  goal 62%  constraints 62%  s/call 5.30
+  MTPO            AF 15/15  speed 2.49  cost 0.94  goal 62%  constraints 64%  s/call 5.41
+  chopping-prio   AF 15/15  speed 1.95  cost 1.13  goal 76%  constraints 76%  s/call 5.00
+
+trials with an inconsistency, by cause (pooled over instances)
+  protocol        trials   double booking
+  serial              15                0
+  naive               15               12
+  2PL-saga            15                0
+  MTPO                15                0
+  chopping-prio       15                0
+
+total spend $7.84 over 75 trials -> results/realm_tours/summary.json
+protocol         wall s  work s  wasted  blocked  overlap  calls  aborts
+serial              107     107      0%       38     1.00   19.9     0.0
+naive                48     115      0%        0     2.39   21.2     0.0
+2PL-saga            103     137     30%      138     1.40   26.1     4.1
+MTPO                 42      96      0%        0     2.33   18.5     0.0
+chopping-prio        53     124     19%       28     2.32   24.7     3.0
