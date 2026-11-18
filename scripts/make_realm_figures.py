@@ -4,7 +4,8 @@
 Reads results/realm/summary.json (written by score_realm.py), so the numbers
 drawn are the ones in its tables.
 
-  (a) anomaly-free trials, pooled over instances, Wilson 95% interval
+  (a) consistent trials, pooled over instances, with a Wilson 95% interval;
+      inconsistent ones stacked by cause (score_realm.failure_causes)
   (b) speed against each instance's serial median
   (c) cost against each instance's serial median
   (d) REALM-Bench plan quality: passengers served, constraints satisfied
@@ -28,7 +29,8 @@ import matplotlib.pyplot as plt  # noqa: E402
 from matplotlib.patches import Patch  # noqa: E402
 
 ROOT = Path(__file__).resolve().parents[1]
-BLUE, ORANGE, AQUA = "#2a78d6", "#eb6834", "#1baf7a"
+BLUE, ORANGE, AQUA, VIOLET = "#2a78d6", "#eb6834", "#1baf7a", "#4a3aa7"
+GREY = "#9a9994"
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d9d8d3"
 ORDER = ["serial", "naive", "2PL-saga", "MTPO", "chopping-prio"]
 
@@ -91,18 +93,33 @@ def main() -> int:
     fig, axes = plt.subplots(2, 3, figsize=(12.5, 7.2))
     (a, b, c), (d, e, f) = axes
 
-    # (a) isolation
+    # (a) isolation: consistent trials, and why the others were not
+    stack = (("af", "consistent", BLUE),
+             ("primary:routing error", "routing error (agent)", GREY),
+             ("primary:wrong release", "wrong release", ORANGE),
+             ("primary:double claim", "double claim", VIOLET))
     for i, p in enumerate(protos):
-        k = sum(per_instance(summary, p, "af"))
         n = sum(per_instance(summary, p, "n"))
+        base = 0.0
+        for key, _, col in stack:
+            k = sum(per_instance(summary, p, key))
+            h = 100 * k / n
+            if h:
+                a.bar(i, h, bottom=base, width=0.56, color=col, zorder=2,
+                      edgecolor="white", lw=1)
+            base += h
+        k = sum(per_instance(summary, p, "af"))
         lo, hi = wilson(k, n)
-        a.bar(i, 100 * k / n, width=0.56, color=BLUE, zorder=2)
-        a.plot([i, i], [100 * lo, 100 * hi], color=INK, lw=1.6, zorder=3)
-        a.text(i, 100 * hi + 2, f"{k}/{n}", ha="center", fontsize=7.5,
-               color=INK)
-    a.set_ylim(0, 112)
-    a.set_ylabel("anomaly-free trials (%)", fontsize=8.5, color=MUTED)
-    a.set_title("(a) no double dispatch", fontsize=9.5, loc="left")
+        a.plot([i, i], [100 * lo, 100 * hi], color=INK, lw=1.4, zorder=3)
+        a.text(i, 102, f"{k}/{n}", ha="center", fontsize=7.5, color=INK)
+    a.set_ylim(0, 140)
+    a.set_yticks(range(0, 101, 20))
+    a.set_ylabel("trials (%)", fontsize=8.5, color=MUTED)
+    a.set_title("(a) dispatch consistency, and the cause when broken",
+                fontsize=9.5, loc="left")
+    a.legend(handles=[Patch(facecolor=c, label=l) for _, l, c in stack],
+             fontsize=7, frameon=False, loc="upper center", ncol=2,
+             borderaxespad=0.2)
     tidy(a, protos)
 
     bars_with_dots(b, protos, summary, "speedup", "{:.2f}", ref=1.0)

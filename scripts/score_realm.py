@@ -15,11 +15,13 @@ from __future__ import annotations
 import argparse
 import json
 import statistics as st
+import sys
 from collections import defaultdict
 from pathlib import Path
 from typing import Any, Dict, List
 
 ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT / "src"))
 ORDER = ["serial", "naive", "2PL-saga", "MTPO", "chopping-prio"]
 REALM_KEYS = ["goal_satisfaction", "constraint_satisfaction", "travel_min",
               "double_dispatch", "record_mismatch", "unclaimed_routed",
@@ -31,6 +33,74 @@ def load(paths: List[Path]) -> List[Dict[str, Any]]:
     for p in paths:
         rows += [json.loads(l) for l in p.read_text().splitlines() if l.strip()]
     return rows
+
+
+CAUSES = ["routing error", "wrong release", "double claim"]
+
+
+def _vehicles(cell: str) -> List[str]:
+    from coagent.workloads.realm_urs import REALM_CELLS, load_instance
+    inst = load_instance(REALM_CELLS[cell].llm_spec["instance"])
+    return [v["vehicle_id"] for v in inst["vehicles"]]
+
+
+def failure_causes(r: Dict[str, Any]) -> List[str]:
+    """Why each inconsistent passenger is inconsistent, from the tool calls.
+
+    routing error  a vehicle routes a passenger it never claimed
+    wrong release  a vehicle that does not route the passenger set its claim
+                   to null, freeing it for a second claimant. Serially that
+                   is a model bug; under MTPO it is also the failed heal --
+                   releasing where it had to hand the claim back
+    double claim   two vehicles both claimed and routed the passenger
+
+    Serial's rate of each cause is the agent-error baseline; what a protocol
+    shows beyond it is interference. Claims made in an attempt a saga later
+    undid still count as claims, so an aborted agent is never blamed for
+    routing a passenger it claimed before the abort.
+    """
+    from coagent.workloads.realm_urs import REQ, ROUTE, route_passengers
+    vids = _vehicles(r["cell"])
+    claimed: Dict[str, set] = defaultdict(set)    # passenger -> claimants
+    nulled: Dict[str, set] = defaultdict(set)     # passenger -> who nulled
+    for i, turns in enumerate(r["transcript"]):
+        me = vids[i] if i < len(vids) else f"agent-{i}"
+        for t in turns:
+            rep = t.get("reply") or {}
+            if rep.get("tool") != "assign_request":
+                continue
+            args = rep.get("args") or {}
+            pid = str(args.get("obj", "")).split("/")[-1]
+            if args.get("vehicle") == me:
+                claimed[pid].add(me)
+            elif args.get("vehicle") is None:
+                nulled[pid].add(me)
+    final = r["final_state"]
+    routed: Dict[str, List[str]] = defaultdict(list)
+    for v in vids:
+        for pid in route_passengers(final.get(ROUTE + v)):
+            routed[pid].append(v)
+    causes = []
+    for pid, vs in routed.items():
+        owner = (final.get(REQ + pid) or {}).get("assigned")
+        if len(vs) < 2 and (owner is None or owner in vs):
+            continue                                  # consistent
+        if any(v not in claimed[pid] for v in vs):
+            causes.append("routing error")
+        elif nulled[pid] - set(vs):
+            causes.append("wrong release")
+        else:
+            causes.append("double claim")
+    return causes
+
+
+def primary(r: Dict[str, Any]) -> str:
+    """The most serious cause in a trial: interference over agent error."""
+    found = set(failure_causes(r))
+    for c in ("double claim", "wrong release", "routing error"):
+        if c in found:
+            return c
+    return ""
 
 
 def count(r: Dict[str, Any], needle: str) -> int:
@@ -69,6 +139,12 @@ def summarise(rows: List[Dict[str, Any]]) -> Dict[str, Any]:
                 "wounds": st.mean(count(r, "WOUND") for r in rs),
                 "notifications": st.mean(r["notifications"] for r in rs),
                 "latency": st.mean(call_latency(r) for r in rs),
+                # trials whose inconsistency includes each cause
+                **{f"cause:{c}": sum(c in failure_causes(r) for r in rs)
+                   for c in CAUSES},
+                # each inconsistent trial once, by its most serious cause
+                **{f"primary:{c}": sum(primary(r) == c for r in rs)
+                   for c in CAUSES},
                 **{k: st.mean(r["realm"][k] for r in rs) for k in REALM_KEYS},
             }
     return out
@@ -119,6 +195,14 @@ def main() -> int:
               f"{st.mean(d['goal_satisfaction'] for d in ds):.0f}%  "
               f"constraints {st.mean(d['constraint_satisfaction'] for d in ds):.0f}%  "
               f"s/call {st.mean(d['latency'] for d in ds):.2f}")
+    print("\ntrials with an inconsistency, by cause (pooled over instances)")
+    print(f"  {'protocol':15}{'trials':>7}" + "".join(f"{c:>15}" for c in CAUSES))
+    for proto in ORDER:
+        ds = [ps[proto] for ps in summary.values() if proto in ps]
+        if ds:
+            print(f"  {proto:15}{sum(d['n'] for d in ds):>7}" + "".join(
+                f"{sum(d['cause:' + c] for d in ds):>15}" for c in CAUSES))
+
     print(f"\ntotal spend ${sum(r['usd'] for r in rows):.2f} over "
           f"{len(rows)} trials -> {args.json}")
     return 0

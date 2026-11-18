@@ -1,0 +1,41 @@
+cell          protocol              AF    speed     cost    dlock    wound    notif   s/call  served%  constr%      dbl     mism    unclm      min
+realm-p3-001  serial               5/5     1.00     1.00      0.0      0.0      0.0     6.25       80       84      0.0      0.0      0.0      208
+realm-p3-001  naive                0/5     2.47     0.96      0.0      0.0      0.0     6.21       53       61      1.4      2.0      0.0      196
+realm-p3-001  2PL-saga             5/5     0.86     1.50      4.2      0.0      0.0     6.13      100       99      0.0      0.0      0.0      240
+realm-p3-001  MTPO                 3/5     1.68     1.12      0.0      0.0      5.6     8.77       67       73      0.2      0.2      1.0      234
+realm-p3-001  chopping-prio        4/5     1.32     1.30      0.0      3.0      0.6     6.29       87       87      0.2      0.2      0.0      216
+
+realm-p3-004  serial               3/5     1.00     1.00      0.0      0.0      0.0     5.43       80       71      0.8      0.8      0.0      235
+realm-p3-004  naive                0/5     1.93     0.95      0.0      0.0      0.0     5.76       54       62      2.4      3.0      0.0      240
+realm-p3-004  2PL-saga             3/5     0.64     1.39      3.6      0.0      0.0     7.40       77       73      0.6      0.6      0.0      212
+realm-p3-004  MTPO                 1/5     1.45     1.30      0.0      0.0     11.0     5.52       49       53      1.2      1.4      1.2      224
+realm-p3-004  chopping-prio        5/5     1.20     1.09      0.0      3.0      0.8     6.06       74       69      0.0      0.0      0.0      181
+
+realm-p3-008  serial               4/5     1.00     1.00      0.0      0.0      0.0     7.62       89       84      0.2      0.2      0.0      264
+realm-p3-008  naive                1/5     1.94     1.21      0.0      0.0      0.0     8.44       49       53      2.2      2.4      0.6      251
+realm-p3-008  2PL-saga             5/5     0.96     1.16      3.2      0.0      0.0     6.91       83       76      0.0      0.0      0.2      243
+realm-p3-008  MTPO                 2/5     2.28     1.30      0.0      0.0     11.6     5.42       49       54      0.0      0.8      0.4      178
+realm-p3-008  chopping-prio        5/5     2.10     1.00      0.0      3.0      0.4     5.91       94       85      0.0      0.0      0.0      241
+
+mean over instances
+  serial          AF 12/15  speed 1.00  cost 1.00  served 83%  constraints 79%  s/call 6.43
+  naive           AF  1/15  speed 2.11  cost 1.04  served 52%  constraints 59%  s/call 6.80
+  2PL-saga        AF 13/15  speed 0.82  cost 1.35  served 87%  constraints 83%  s/call 6.81
+  MTPO            AF  6/15  speed 1.80  cost 1.24  served 55%  constraints 60%  s/call 6.57
+  chopping-prio   AF 14/15  speed 1.54  cost 1.13  served 85%  constraints 80%  s/call 6.09
+
+trials with an inconsistency, by cause (pooled over instances)
+  protocol        trials  routing error  wrong release   double claim
+  serial              15              2              1              0
+  naive               15              2              2             13
+  2PL-saga            15              1              1              0
+  MTPO                15              1              2              7
+  chopping-prio       15              1              0              0
+
+total spend $11.00 over 75 trials -> /Users/farzad/Desktop/Research/LLMConcurrency/results/realm/summary.json
+
+paired comparisons over 15 (instance, seed) pairs, 95% bootstrap CI
+  chopping-prio vs 2PL-saga: speed x1.82 [1.57,2.10]  consistent +0.07 [-0.13,+0.27]  cost x0.80 [0.73,0.87]
+  chopping-prio vs MTPO: speed x0.95 [0.75,1.22]  consistent +0.53 [+0.27,+0.80]  cost x0.89 [0.77,1.02]
+  chopping-prio vs serial: speed x1.70 [1.40,2.12]  consistent +0.13 [-0.13,+0.40]  cost x1.11 [0.99,1.26]
+  MTPO vs 2PL-saga: speed x1.92 [1.43,2.43]  consistent -0.47 [-0.73,-0.20]  cost x0.90 [0.77,1.07]

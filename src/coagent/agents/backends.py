@@ -167,6 +167,8 @@ class AnthropicBackend:
     """
 
     provider = "anthropic"
+    # seconds per request; the slowest Haiku call seen so far took ~30 s
+    TIMEOUT_S = 120.0
 
     def __init__(
         self,
@@ -189,8 +191,13 @@ class AnthropicBackend:
         # latency this backend measures and feeds to the runtime as a step
         # duration. Retrying here instead keeps the recorded latency equal to
         # the attempt that actually succeeded.
-        self.client = (anthropic.Anthropic(api_key=key, max_retries=0) if key
-                       else anthropic.Anthropic(max_retries=0))
+        # An explicit timeout: a connection that dies silently (a laptop
+        # sleeping mid-run) otherwise blocks a trial for over an hour. A
+        # timed-out attempt is retried below like any transient error, and
+        # only the successful attempt's latency is recorded.
+        opts = {"max_retries": 0, "timeout": self.TIMEOUT_S}
+        self.client = (anthropic.Anthropic(api_key=key, **opts) if key
+                       else anthropic.Anthropic(**opts))
         self._anthropic = anthropic
 
     # Haiku 4.5 and older models reject `output_config.effort`, and take
