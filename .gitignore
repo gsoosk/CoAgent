@@ -13,3 +13,6 @@ __pycache__/
 .DS_Store
 results/*/llm_runs.jsonl.tmp
 .DS_Store
+
+# fetched by scripts/fetch_realm_bench.sh (no upstream license; not redistributed)
+third_party/

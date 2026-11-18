@@ -76,6 +76,7 @@ class LLMAgent:
         model: Optional[str] = None,
         max_rounds: int = 14,
         pieces: Optional[List[Any]] = None,
+        retry_unparsed: bool = False,
         **backend_kw: Any,
     ):
         self.name = name
@@ -89,6 +90,10 @@ class LLMAgent:
         self.rounds = 0
         self.refusals = 0
         self.unparsed = 0
+        # An unparsed reply ends the agent by default (the matrix was scored
+        # that way). Planning tasks that reason at length in prose overrun
+        # the token cap mid-thought, so they can opt into a format reminder.
+        self.retry_unparsed = retry_unparsed
         # Footprints are supplied by the workload, not inferred from the
         # model: the paper evaluates *enforcement* of manifests, not
         # their derivation.
@@ -157,6 +162,14 @@ class LLMAgent:
             out = self._complete()
             self.rounds += 1
             reply = out.parsed
+            if reply.get("_unparsed") and self.retry_unparsed:
+                self.messages.append({
+                    "role": "user",
+                    "content": ("Your last reply was not a single JSON object "
+                                "(it may have been cut off). Keep reasoning "
+                                "short and reply with exactly one JSON object."),
+                })
+                continue
             if reply.get("done"):
                 return
             spec = self.tools.get(reply.get("tool", ""))

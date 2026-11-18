@@ -9,6 +9,8 @@ dependencies = []
 figures = ["matplotlib>=3.7"]
 llm = ["requests>=2.31"]
 dev = ["pytest>=8.0"]
+# REALM-Bench's evaluation/metrics.py imports numpy (scripts/fetch_realm_bench.sh)
+realm = ["numpy>=1.24"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

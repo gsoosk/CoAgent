@@ -41,12 +41,13 @@ from coagent.runner import reference_states            # noqa: E402
 from coagent.runtime import CallKind, Runtime          # noqa: E402
 from coagent.workloads import CELLS as _BENCH_CELLS     # noqa: E402
 from coagent.workloads.reorder_cells import REORDER_CELLS  # noqa: E402
+from coagent.workloads.realm_urs import REALM_CELLS     # noqa: E402
 from coagent.workloads.base import invariant_ok, normalize  # noqa: E402
 
 
-# The reorder cells are addressable by name but are not part of "all", so
-# the benchmark matrix stays the twelve cells it was scored on.
-CELLS = {**_BENCH_CELLS, **REORDER_CELLS}
+# The reorder and REALM cells are addressable by name but are not part of
+# "all", so the benchmark matrix stays the twelve cells it was scored on.
+CELLS = {**_BENCH_CELLS, **REORDER_CELLS, **REALM_CELLS}
 
 
 class _JudgeStub:
@@ -129,6 +130,13 @@ def main() -> int:
                          "protocol name with a '-free' suffix")
     ap.add_argument("--force", action="store_true",
                     help="re-run trials already present in the output file")
+    ap.add_argument("--retry-unparsed", action="store_true",
+                    help="on a reply that is not JSON, remind the model of "
+                         "the format instead of ending the agent")
+    ap.add_argument("--interleave", action="store_true",
+                    help="run every protocol for one seed before the next "
+                         "seed, so model latency drifting over the session "
+                         "lands on all protocols alike")
     ap.add_argument("--out", default=str(ROOT / "results" / "llm_runs.jsonl"))
     args = ap.parse_args()
 
@@ -145,8 +153,12 @@ def main() -> int:
 
     out_path = Path(args.out)
     seen = set() if args.force else done_keys(out_path)
-    plan = [(c, p, s) for c in cells for p in protos
-            for s in range(args.trials) if (c, p, s) not in seen]
+    if args.interleave:
+        plan = [(c, p, s) for c in cells for s in range(args.trials)
+                for p in protos if (c, p, s) not in seen]
+    else:
+        plan = [(c, p, s) for c in cells for p in protos
+                for s in range(args.trials) if (c, p, s) not in seen]
 
     est = price(model, EST_PROMPT, EST_COMPLETION) * len(plan)
     print(f"provider   {args.provider}")
@@ -200,6 +212,7 @@ def main() -> int:
                          provider=args.provider, model=model,
                          max_rounds=args.max_rounds,
                          pieces=declared[i] if i < len(declared) else [],
+                         retry_unparsed=args.retry_unparsed,
                          effort=args.effort, thinking=not args.no_thinking)
                 for i, task in enumerate(cell.llm_spec["tasks"])
             ]
@@ -248,6 +261,11 @@ def main() -> int:
             if cell.anomaly_free is not None:
                 rec["anomaly_free"] = bool(
                     cell.anomaly_free(rec["final_state"], refs))
+            if cell.suite == "realm":
+                # REALM-Bench's own plan-quality metrics for the same state
+                from coagent.workloads.realm_eval import evaluate
+                rec["realm"] = evaluate(cell.llm_spec["instance"],
+                                        rec["final_state"])
             if hasattr(protocol, "stats"):
                 rec["proto_stats"] = protocol.stats()
             if getattr(protocol, "plan", None) is not None:
@@ -259,8 +277,11 @@ def main() -> int:
             results.append(rec)
             fh.write(json.dumps(rec, default=str) + "\n")
             fh.flush()
+            af = rec.get("anomaly_free")
             print(f"{cell_name:24} {proto:10} seed={seed} "
                   f"{'PASS' if ok else 'FAIL'} "
+                  + ("" if af is None else f"AF={'y' if af else 'n'} ")
+                  + f"wall={wall:.0f}s "
                   f"notif={notes} rounds={rec['rounds']} "
                   f"${rec['usd']:.4f}")
 

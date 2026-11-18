@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import itertools
 import random
 import zlib
 from dataclasses import dataclass
@@ -41,25 +42,32 @@ class TrialConfig:
     len_sigma: float = 0.40
 
 
-def _build(cell: Cell, order: List[int], cfg: TrialConfig, rng) -> List[Any]:
+def _build(cell: Cell, order: Optional[List[int]], cfg: TrialConfig,
+           rng) -> List[Any]:
     oracle = JudgmentOracle(rng, p_misjudge=cfg.p_misjudge)
     agents = cell.build_agents(
         oracle, rng,
         p_task_failure=cfg.p_task_failure,
         p_redo_truncate=cfg.p_redo_truncate,
     )
-    return [agents[i] for i in order]
+    return agents if order is None else [agents[i] for i in order]
 
 
 def reference_states(cell: Cell) -> List[Dict[str, Any]]:
-    """Run the cell serially in both orders: the two acceptable outcomes."""
+    """Run the cell serially in every order: the acceptable outcomes.
+
+    Two orders for the pair cells; a REALM cell has one agent per vehicle,
+    so it gets every permutation of them.
+    """
     refs = []
     clean = TrialConfig(p_misjudge=0.0, p_task_failure=0.0, jitter=0.0,
                         p_redo_truncate=0.0)
-    for order in ([0, 1], [1, 0]):
+    n = len(cell.build_agents(JudgmentOracle(random.Random(0), 0.0),
+                              random.Random(0)))
+    for perm in itertools.permutations(range(n)):
         rng = random.Random(0)
         target = cell.fresh_target()
-        agents = _build(cell, order, clean, rng)
+        agents = _build(cell, list(perm), clean, rng)
         rt = Runtime(target, agents, SerialProtocol(), rng, retry_cap=5)
         rt.jitter_sigma = 0.0
         rt.time_scale = 1.0
@@ -91,7 +99,6 @@ def run_trial(
     refs = refs if refs is not None else reference_states(cell)
     rng = random.Random(seed)
     target = cell.fresh_target()
-    order = order or [0, 1]
     agents = _build(cell, order, cfg, rng)
     protocol = PROTOCOLS[protocol_name]()
     rt = Runtime(target, agents, protocol, rng, retry_cap=cfg.retry_cap)
@@ -101,7 +108,10 @@ def run_trial(
         # Task lengths are a property of the (cell, trial), not of the
         # protocol: every protocol must face the same pair of agents, or the
         # comparison is unpaired and the speedup ratio is meaningless.
-        tag = f"{cell.name}:{seed}:{order}".encode()
+        # the default order prints as [0, 1, ...], as it always has, so the
+        # pair cells keep the task lengths their published numbers used
+        shown = order if order is not None else list(range(len(agents)))
+        tag = f"{cell.name}:{seed}:{shown}".encode()
         len_rng = random.Random(zlib.crc32(tag))
         for st in rt.states.values():
             st.speed = max(0.25, len_rng.lognormvariate(0.0, cfg.len_sigma))
